@@ -1,0 +1,64 @@
+#!/bin/bash
+
+set -eu
+
+# Serving ownCloud then Nextcloud at localhost:8080
+# Username: admin
+# Password: admin
+
+docker kill oc || true
+docker rm oc || true
+
+docker run \
+	--rm \
+	--name oc \
+	--detach \
+	--env OWNCLOUD_DOMAIN=localhost:8080 \
+	--publish 8080:8080 \
+	--volume /var/www/owncloud \
+	--volume "$PWD":/mnt/local \
+	owncloud/server:10.11
+
+docker exec -it oc apt update
+docker exec -it oc apt install -y rsync nano git
+
+docker exec -it oc occ market:install windows_network_drive
+docker exec -it oc occ app:enable windows_network_drive
+
+docker exec -it oc occ config:app:set core enable_external_storage --value yes
+docker exec -it oc occ files_external:create --config=host=test.com --config=share=test_share_password --config=user=test_user --config=password=test_password -- /test_wnd_password windows_network_drive password::password
+docker exec -it oc occ files_external:create --config=host=test.com --config=share=test_share_sessioncredentials -- /test_wnd_sessioncredentials windows_network_drive password::sessioncredentials
+docker exec -it oc occ files_external:create --config=host=test.com --config=share=test_share_logincredentials -- /test_wnd_logincredentials windows_network_drive password::logincredentials
+docker exec -it oc occ files_external:create --config=host=test.com --config=share=test_share_userprovided -- /test_wnd_userprovided windows_network_drive password::userprovided
+docker exec -it oc occ files_external:create --config=host=test.com --config=share=test_share_global -- /test_wnd_global windows_network_drive password::global
+docker exec -it oc occ files_external:create --config=host=test.com --config=share=test_share_hardcodedconfigcredentials --config=key=test_key -- /test_wnd_hardcodedconfigcredentials windows_network_drive password::hardcodedconfigcredentials
+docker exec -it oc occ files_external:create --config=host=test.com --config=share=test_share_kerberos --config=kerberosServerId=test_kerberos -- /test_wnd_kerberos windows_network_drive kerberos::kerberos
+docker exec -it oc occ config:app:set files_external allow_user_mounting --value yes
+
+read -rp "> Double press enter to start the migration."
+
+# 1. Set up the credentials in the file view
+# 2. Set the global credentials
+# 3. Set the user global credentials
+
+docker exec -it oc cp /var/www/owncloud/config/config.php /var/www/config.php
+docker cp oc:/mnt/data/files/owncloud.db ./
+docker exec -it oc occ files_external:export
+
+docker exec -it oc rsync --delete --recursive --human-readable --exclude .git --exclude node_modules --exclude config/config.php /mnt/local/ /var/www/owncloud
+docker exec -it oc cp /var/www/config.php /var/www/owncloud/config/config.php
+docker exec -it oc chown -R www-data:www-data /var/www/owncloud
+docker exec -it oc sed -i '9,14d' /var/www/owncloud/config/config.php
+
+docker exec -it oc nano config/config.php
+# 1. Add apps-extra directory
+
+docker exec -it oc occ upgrade -vvv
+
+# Use this command to copy your change in MigrateOauthTables.php to the docker container.
+docker exec -it oc cp /mnt/local/apps/files_external/lib/Command/MigrateOc.php /var/www/owncloud/apps/files_external/lib/Command/MigrateOc.php & docker exec -it oc occ -vvv files_external:migrate-oc --dry-run
+
+# occ db:convert-filecache-bigint
+# occ db:add-missing-columns
+# occ db:add-missing-indices
+# occ db:add-missing-primary-keys

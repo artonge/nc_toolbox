@@ -1,0 +1,896 @@
+#!/bin/bash
+
+set -eu
+
+function start_service {
+
+	service=$1
+	if ! systemctl is-active $service
+	then
+		sudo systemctl start $service
+	fi
+}
+
+for service in php-fpm blackfire-agent nginx redis
+do
+	start_service "$service"
+done
+
+# Default values.
+{
+	workspace="$(realpath "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)/../..")"
+	instancesPath="$workspace/instances"
+	APP_LIST_EXTRA=()
+	initialConfig=''
+
+	function occ {
+		php occ "$@"
+	}
+}
+
+
+# Parse arguments.
+{
+	export instance="${1:-}"
+	targetVersion="${2:-master}"
+
+	if [ "$instance" == "" ]
+	then
+		mapfile -t instances < <(find "$instancesPath" -maxdepth 4 -name config.php)
+
+		if [ "${#instances[@]}" == "0" ]
+		then
+			echo "No instance found, exiting."
+			exit 0
+		fi
+
+		echo -e " \033[1m- Found ${#instances[@]} instances, which one do you want to reset ?\033[0m "
+
+		for i in "${!instances[@]}"
+		do
+			instanceName=$(basename "$(dirname "$(dirname "${instances[$i]}")")")
+			echo "    - $instanceName"
+		done
+
+		read -rp "> " instance
+	fi
+
+	instancePath="$instancesPath/$instance"
+	instanceDomain="nextcloud_$instance.test"
+
+	if [ "$targetVersion" == "" ]
+	then
+		echo -e " \033[1m- Which version do you want to install ? (Ex: stable20, master, ...)\033[0m"
+
+		mapfile -t versions < <(git branch | grep stable)
+
+		echo "    - master"
+		if [ "${#versions[@]}" != "0" ]
+		then
+			for i in "${!versions[@]}"
+			do
+				echo "    - ${versions[$i]}"
+			done
+		fi
+
+		read -rp "> " targetVersion
+	fi
+}
+
+
+# Parse options.
+{
+	TEMP=$(getopt --longoptions 's3,checkout:,fetch,database:,ldap,saml,encryption,extra-app:,link-app:,repository:,update-only,offline,test,help' --name argError --options 'bc:fd:lsea:hx:r:uot' -- "$@")
+	eval set -- "$TEMP"
+	unset TEMP
+	while true; do
+		case "$1" in
+			'-c'|'--checkout')
+				checkoutTo=$2
+				shift 2
+				continue
+			;;
+			'-b'|'--bucket')
+				enableS3Bucket=true
+				shift
+				continue
+			;;
+			'-f'|'--fetch')
+				fetchRepo=true
+				shift
+				continue
+			;;
+			'-l'|'--ldap')
+				enableLdap=true
+				shift
+				continue
+			;;
+			'-s'|'--saml')
+				enableSaml=true
+				shift
+				continue
+			;;
+			'-e'|'--encryption')
+				enableEncryption=true
+				shift
+				continue
+			;;
+			'-d'|'--database')
+				database=$2
+				shift 2
+				continue
+			;;
+			'-a'|'--extra-app')
+				APP_LIST_EXTRA+=("$2")
+				shift 2
+				continue
+			;;
+			'-x'|'--link-app')
+				APP_LIST_LOCAL_LINK+=("$2")
+				shift 2
+				continue
+			;;
+			'-u'|'--update-only')
+				updateOnly=true
+				shift
+				continue
+			;;
+			'-r'|'--repository')
+				repository+=("$2")
+				shift 2
+				continue
+			;;
+			'-o'|'--offline')
+				offline=true
+				shift
+				continue
+			;;
+			'-t'|'--test')
+				test=true
+				shift
+				continue
+			;;
+			'-h'|'--help')
+				help_string=""
+				help_string+='nc_reset_instance <instance-name (folder name)> [<branch-name>]'$'\n'
+				help_string+='	-c --checkout | Checkout the given branch or tag for server.'$'\n'
+				help_string+='	-b --bucket | Enable S3 bucket.'$'\n'
+				help_string+='	-f --fetch | Fetch repositories before checkout the branch.'$'\n'
+				help_string+='	-d --database <mysql,pgsql> | Set the database to use. Default: mysql.'$'\n'
+				help_string+='	-l --ldap | Enable ldap.'$'\n'
+				help_string+='	-e --encryption | Enable encryption.'$'\n'
+				help_string+='	-a --extra-app <app-name> | Enable given application. Can be submitted multiple times.'$'\n'
+				help_string+='	-x --link-app <app-name> | Link a local application into the apps directory of the instance. Can be submitted multiple times.'$'\n'
+				help_string+='	-r --repository <app-name> | Nextcloud repository to clone.'$'\n'
+				help_string+='	-u --update-only | Do not touch user data.'$'\n'
+				help_string+='	-o --offline | Do not make remote git operations.'$'\n'
+				help_string+='	-t --test | Prep the instance for tests only.'$'\n'
+				help_string+='	-h --help | Display this help message.'$'\n'
+				echo "$help_string" | column -t -s "|"
+				exit 0
+			;;
+			'--')
+				break
+			;;
+			*)
+				echo "Extra arg: $1"
+				shift 2
+				continue
+			;;
+		esac
+	done
+}
+
+
+# App lists.
+{
+	APP_LIST_SHIPPED=()
+	APP_LIST_SHIPPED+=(activity)
+	APP_LIST_SHIPPED+=(files_pdfviewer)
+	APP_LIST_SHIPPED+=(files_rightclick)
+	# APP_LIST_SHIPPED+=(files_videoplayer) DEPRECATED
+	APP_LIST_SHIPPED+=(firstrunwizard)
+	APP_LIST_SHIPPED+=(logreader)
+	APP_LIST_SHIPPED+=(nextcloud_announcements)
+	APP_LIST_SHIPPED+=(notifications)
+	# APP_LIST_SHIPPED+=(password_policy)
+	APP_LIST_SHIPPED+=(photos)
+	APP_LIST_SHIPPED+=(privacy)
+	APP_LIST_SHIPPED+=(recommendations)
+	APP_LIST_SHIPPED+=(serverinfo)
+	APP_LIST_SHIPPED+=(survey_client)
+	APP_LIST_SHIPPED+=(text)
+	APP_LIST_SHIPPED+=(viewer)
+
+	APP_LIST_SHIPPED_ENTERPRISE=()
+	APP_LIST_SHIPPED_ENTERPRISE+=(support)
+
+	APP_LIST_DEV=()
+	APP_LIST_DEV+=(hmr_enabler)
+	APP_LIST_DEV+=(profiler)
+	APP_LIST_DEV+=(previewgenerator)
+
+	APP_LIST_SUPPORTED=()
+	# Files subscription
+	APP_LIST_SUPPORTED+=(globalsiteselector)
+	APP_LIST_SUPPORTED+=(bruteforcesettings)
+	APP_LIST_SUPPORTED+=(circles)
+	APP_LIST_SUPPORTED+=(data_request)
+	APP_LIST_SUPPORTED+=(external)
+	APP_LIST_SUPPORTED+=(files_accesscontrol)
+	APP_LIST_SUPPORTED+=(files_antivirus)
+	APP_LIST_SUPPORTED+=(files_automatedtagging)
+	APP_LIST_SUPPORTED+=(files_fulltextsearch)
+	APP_LIST_SUPPORTED+=(files_fulltextsearch_tesseract)
+	APP_LIST_SUPPORTED+=(files_retention)
+	APP_LIST_SUPPORTED+=(flow_notifications)
+	APP_LIST_SUPPORTED+=(fulltextsearch)
+	APP_LIST_SUPPORTED+=(fulltextsearch_elasticsearch)
+	APP_LIST_SUPPORTED+=(groupfolders)
+	APP_LIST_SUPPORTED+=(guests)
+	APP_LIST_SUPPORTED+=(sharepoint)
+	APP_LIST_SUPPORTED+=(socialsharing_diaspora)
+	APP_LIST_SUPPORTED+=(socialsharing_email)
+	APP_LIST_SUPPORTED+=(socialsharing_facebook)
+	APP_LIST_SUPPORTED+=(socialsharing_twitter)
+	APP_LIST_SUPPORTED+=(suspicious_login)
+	APP_LIST_SUPPORTED+=(terms_of_service)
+	APP_LIST_SUPPORTED+=(twofactor_totp)
+	APP_LIST_SUPPORTED+=(twofactor_u2f)
+	APP_LIST_SUPPORTED+=(user_oidc)
+	APP_LIST_SUPPORTED+=(user_saml)
+	APP_LIST_SUPPORTED+=(workflow_script)
+	# Groupware subscription
+	APP_LIST_SUPPORTED+=(calendar)
+	APP_LIST_SUPPORTED+=(contacts)
+	APP_LIST_SUPPORTED+=(deck)
+	APP_LIST_SUPPORTED+=(mail)
+	# Dedicated subscriptions
+	APP_LIST_SUPPORTED+=(spreed)
+	APP_LIST_SUPPORTED+=(richdocuments)
+	APP_LIST_SUPPORTED+=(onlyoffice)
+	APP_LIST_SUPPORTED+=(hancomoffice)
+	APP_LIST_SUPPORTED+=(OfficeOnline)
+	# Other apps we market or sold individually to single customers
+	APP_LIST_SUPPORTED+=(app-tutorial)
+	APP_LIST_SUPPORTED+=(apswhisperer) # AMX
+	APP_LIST_SUPPORTED+=(end_to_end_encryption) # Magentacloud
+	APP_LIST_SUPPORTED+=(forms) # Marketing NC19
+	APP_LIST_SUPPORTED+=(groupquota) # Manz Solutions GmbH
+	APP_LIST_SUPPORTED+=(impersonate) # ownCloud Checkbox
+	# APP_LIST_SUPPORTED+=(integration_*)
+	APP_LIST_SUPPORTED+=(ldap_contacts_backend) # Uni Nantes
+	APP_LIST_SUPPORTED+=(ldap_write_support) # Wurth
+	APP_LIST_SUPPORTED+=(notify_push)
+	APP_LIST_SUPPORTED+=(registration) # MCIT
+	APP_LIST_SUPPORTED+=(social) # Marketing NC15
+	APP_LIST_SUPPORTED+=(survey_server) # Nextcloud GmbH - Usage statistics
+	APP_LIST_SUPPORTED+=(talk_matterbridge) # Marketing NC20
+	APP_LIST_SUPPORTED+=(user_retention) # TUV Rheinland
+	APP_LIST_SUPPORTED+=(user_usage_report) # AMX
+	APP_LIST_SUPPORTED+=(workflow_pdf_converter) # Marketing of flows
+	APP_LIST_SUPPORTED+=(twofactor_admin) # Landschaftverband Westfalen-Lippe
+}
+
+
+# TLS certificates.
+{
+	livePath="/etc/letsencrypt/live"
+	certPath="$livePath/nextcloud_$instance"
+
+	# Prevent overriding existing root CA.
+	if [ ! -f "$livePath/chain.pem" ]
+	then
+		echo -e " \033[1m- Generating root CA.\033[0m"
+
+		# Write root CA configuration file.
+		echo "[ req ]
+		prompt             = no
+		string_mask        = default
+		default_bits       = 2048
+		distinguished_name = req_distinguished_name
+		x509_extensions    = x509_ext
+		[ req_distinguished_name ]
+		organizationName = $HOSTNAME
+		commonName = Local Root CA
+		[ x509_ext ]
+		basicConstraints=critical,CA:true,pathlen:0
+		keyUsage=critical,keyCertSign,cRLSign" | sudo tee "$livePath/local_root_ca.conf" 1> /dev/null
+
+		# Creating root CA.
+		sudo openssl req \
+			-days 3650 \
+			-nodes \
+			-x509 \
+			-new \
+			-keyout "$livePath/local_root.key" \
+			-out "$livePath/chain.pem" \
+			-config "$livePath/local_root_ca.conf"
+
+		echo "You can install the following CA in your browser to ease development: $livePath/chain.pem"
+
+	fi
+
+	if [ ! -d "$certPath" ]
+	then
+		echo -e " \033[1m- Generating certificates for instance $instance.\033[0m"
+
+		sudo mkdir -p "$certPath"
+
+		# Write certificates configuration file.
+		echo "[ req ]
+		prompt             = no
+		string_mask        = default
+		default_bits       = 2048
+		distinguished_name = req_distinguished_name
+		x509_extensions    = x509_ext
+		[ req_distinguished_name ]
+		organizationName = Nextcloud local
+		commonName = $instanceDomain
+		[ x509_ext ]
+		keyUsage=critical,digitalSignature,keyAgreement
+		subjectAltName = @alt_names
+		[alt_names]
+		DNS.1 = $instanceDomain" | sudo tee "$certPath/server_cert.conf" 1> /dev/null
+
+		# Generating TLS certificate.
+		sudo openssl req \
+			-nodes \
+			-new \
+			-keyout "$certPath/privkey.pem" \
+			-out "$certPath/server.csr" \
+			-config "$certPath/server_cert.conf"
+
+		# Signing certificate with root CA.
+		sudo openssl x509 \
+			-days 3650 \
+			-req \
+			-in "$certPath/server.csr" \
+			-CA "$livePath/chain.pem" \
+			-CAkey "$livePath/local_root.key" \
+			-set_serial "$RANDOM" \
+			-out "$certPath/fullchain.pem" \
+			-extfile "$certPath/server_cert.conf" \
+			-extensions x509_ext
+
+		echo "PLEASE APPEND /etc/pki/tls/certs/ca-bundle.crt WITH '$livePath/chain.pem'"
+		# sudo su
+		# echo "# Local CA by artonge 19/10/2023" >> /etc/pki/tls/certs/ca-bundle.crt
+		# cat /etc/letsencrypt/live/chain.pem >> /etc/pki/tls/certs/ca-bundle.crt
+	fi
+}
+
+
+# Nginx
+{
+	if [ ! -f "/etc/nginx/conf.d/$instanceDomain.conf" ]
+	then
+		echo -e " \033[1m- Setting up Nginx.\033[0m"
+		envsubst "\$instance" < /etc/nginx/conf.d/nextcloud.test.conf.template | sudo tee "/etc/nginx/conf.d/$instanceDomain.conf" 1> /dev/null
+		sudo systemctl restart nginx
+	fi
+}
+
+
+# /etc/hosts
+{
+	if ! grep "$instanceDomain" /etc/hosts 1> /dev/null
+	then
+		echo -e " \033[1m- Setting up /etc/hosts.\033[0m"
+		echo "127.0.0.1	$instanceDomain" | sudo tee --append /etc/hosts 1> /dev/null
+	fi
+}
+
+
+echo -e " \033[1m- Setting up files for instance $instance on $targetVersion.\033[0m"
+{
+	if [ ! -e "$instancePath" ]
+	then
+		git clone --quiet "${repository:-git@github.com:nextcloud/server.git}" "$instancePath"
+	fi
+
+	cd "$instancePath"
+
+	if [ "${updateOnly:-false}" = "false" ]
+	then
+		echo -e "	- Deleting data and configuration."
+		rm -rf "$instancePath"/data/*
+		rm -rf "$instancePath"/config/config.php
+	fi
+
+	if [[ "${fetchRepo:-false}" == "true" && "${offline:-false}" == "false" ]]
+	then
+		git fetch --force --tags --prune --prune-tags --recurse-submodules --quiet
+	fi
+
+	git checkout --quiet .htaccess
+
+	if [ "${checkoutTo:-}" != "" ]
+	then
+		echo -e "	- Checking out $checkoutTo."
+		git checkout --quiet --recurse-submodules "$checkoutTo"
+	else
+		echo -e "	- Checking out $targetVersion."
+		git checkout --quiet --recurse-submodules "$targetVersion"
+	fi
+
+	mkdir --parent "$instancePath/apps-extra"
+
+	# Asynchronously pull new changes for server.
+	if [ "${offline:-false}" == "false" ]
+	then
+		# Do not pull if we are on a tag
+		if ! git describe --exact-match --tags HEAD >/dev/null 2>&1;
+		then
+			git pull --quiet &
+		fi
+		git submodule --quiet update --init &
+	fi
+}
+
+
+echo -e " \033[1m- Setting up apps.\033[0m"
+{
+	initialConfig="$initialConfig\
+		'apps_paths' => [\
+			[\
+					'path'=> '$instancePath/apps',\
+					'url' => '/apps',\
+					'writable' => false,\
+			],\
+			[\
+					'path'=> '$instancePath/apps-extra',\
+					'url' => '/apps-extra',\
+					'writable' => true,\
+			],
+		],"
+
+	function setup_app() {
+		app="$1"
+		clone_url="$2"
+		version="${3:-$targetVersion}"
+
+		if [[ "${test:-false}" == "true" ]]
+		then
+			echo "		- Skipping setup $app"
+			return
+		fi
+
+		printf "		- $app ...\r"
+
+		if [ ! -e "$instancePath/apps-extra/$app" ]
+		then
+			if [ -e "$workspace/apps/$app" ]
+			then
+				rsync -az "$workspace/apps/$app/" "$instancePath/apps-extra/$app"
+			else
+				git clone --quiet "$clone_url" "$instancePath/apps-extra/$app" > /dev/null
+			fi
+		fi
+
+		if [[ "${fetchRepo:-false}" == "true" && "${offline:-false}" == "false" ]]
+		then
+			git -C "$instancePath/apps-extra/$app" fetch --force --tags --prune --prune-tags --recurse-submodules --quiet
+		fi
+
+		# Default to main or master if the target does not exists.
+		git -C "$instancePath/apps-extra/$app" checkout --quiet "$version" ||
+		git -C "$instancePath/apps-extra/$app" checkout --quiet "main" ||
+		git -C "$instancePath/apps-extra/$app" checkout --quiet "master"
+
+		echo "		- $app ($(git -C "$instancePath/apps-extra/$app" rev-parse --abbrev-ref HEAD))"
+
+		# Asynchronously pull new changes for the app.
+		if [ "${offline:-false}" == "false" ]
+		then
+			{
+				{
+					git -C "$instancePath/apps-extra/$app" fetch --quiet
+					git -C "$instancePath/apps-extra/$app" pull --quiet
+				} &
+				composer --quiet --working-dir "$instancePath/apps-extra/$app" install &
+			} || echo "Failed to update $app"
+		else
+			composer dumpautoload --quiet &
+		fi
+	}
+
+	echo -e "	- Removing linked applications."
+	for app in "$instancePath"/apps-extra/*
+	do
+		if [ -L "$app" ]
+		then
+			echo "		- $(basename "$app")"
+			rm -rf "$app"
+		fi
+	done
+
+	echo -e "	- Removing extra applications."
+	for app in "$instancePath"/apps-extra/*
+	do
+		appName=$(basename "$app")
+		if [[ " ${APP_LIST_SHIPPED[*]} " == *" $appName "* ]]
+		then
+			continue
+		fi
+
+		if [[ " ${APP_LIST_SHIPPED_ENTERPRISE[*]} " == *" $appName "* ]]
+		then
+			continue
+		fi
+
+		if [[ " ${APP_LIST_DEV[*]} " == *" $appName "* ]]
+		then
+			continue
+		fi
+
+		echo "		- $appName"
+		rm -rf "$instancePath/apps-extra/$appName"
+	done
+
+
+	echo -e "	- Linking local applications."
+	for app in "${APP_LIST_LOCAL_LINK[@]}"
+	do
+		"$workspace"/engineering/bin/nc_link_app "$instance" "$app"
+		echo "		- $app ($(git --git-dir "$instancePath/apps-extra/$app/.git" rev-parse --abbrev-ref HEAD))"
+	done
+
+	echo -e "	- Setting up default applications."
+	for app in "${APP_LIST_SHIPPED[@]}"
+	do
+		if [[ " ${APP_LIST_LOCAL_LINK[*]} " =~ " $app " ]]
+		then
+			continue
+		fi
+
+		setup_app "$app" "git@github.com:nextcloud/$app.git"
+	done
+
+	for app in "${APP_LIST_SHIPPED_ENTERPRISE[@]}"
+	do
+		setup_app "$app" "git@github.com:nextcloud-gmbh/$app.git"
+	done
+
+	echo -e "	- Setting up dev applications."
+	for app in "${APP_LIST_DEV[@]}"
+	do
+		setup_app "$app" "git@github.com:nextcloud/$app.git" master
+	done
+
+	wait
+}
+
+# Early exit if update only.
+{
+	if [ "${updateOnly:-false}" = "true" ]
+	then
+		occ upgrade
+		echo -e " \033[1m- Early exit due to --update-only flag.\033[0m"
+		exit 0
+	fi
+}
+
+
+echo -e " \033[1m- Recreating ${database:-mysql} database.\033[0m"
+{
+	if [ "${database:-mysql}" == "mysql" ]
+	then
+		start_service mariadb
+		dbPort=3306
+		sudo -u mysql mysql <<-EOSQL
+			DROP DATABASE IF EXISTS nextcloud_$instance;
+			DROP USER IF EXISTS nextcloud_$instance;
+
+			CREATE USER nextcloud_$instance IDENTIFIED BY 'password';
+			CREATE DATABASE nextcloud_$instance;
+			GRANT ALL PRIVILEGES ON nextcloud_$instance.* TO nextcloud_$instance identified by 'password';
+		EOSQL
+	elif [ "${database:-mysql}" == "pgsql" ]
+	then
+		start_service postgresql
+		dbPort=5432
+		sudo -u postgres psql -v ON_ERROR_STOP=1 <<-EOSQL
+			DROP DATABASE IF EXISTS nextcloud_$instance;
+			DROP ROLE IF EXISTS nextcloud_$instance;
+
+			CREATE USER nextcloud_$instance WITH ENCRYPTED PASSWORD 'password';
+			CREATE DATABASE nextcloud_$instance WITH OWNER nextcloud_$instance;
+		EOSQL
+	else
+		echo "Database must be 'mysql' or 'pgsql'"
+		exit 1
+	fi
+}
+
+# Setup S3 Primary storage
+{
+	if [ "${enableS3Bucket:-false}" == "true" ]
+	then
+		echo -e " \033[1m- Setting up S3 bucket.\033[0m"
+		index=${instance/server/}
+		sseCKey=""
+		certPath="/etc/letsencrypt/live/nextcloud_minio"
+
+		if [ ! -d "$certPath" ]
+		then
+			echo -e " \033[1m- Generating certificates for minio.\033[0m"
+
+			sudo mkdir -p "$certPath"
+
+			# Write certificates configuration file.
+			echo "[ req ]
+			prompt             = no
+			string_mask        = default
+			default_bits       = 2048
+			distinguished_name = req_distinguished_name
+			x509_extensions    = x509_ext
+			[ req_distinguished_name ]
+			organizationName = Nextcloud local
+			commonName = localhost
+			[ x509_ext ]
+			keyUsage=critical,digitalSignature,keyAgreement
+			subjectAltName = @alt_names
+			[alt_names]
+			DNS.1 = localhost
+			DNS.2 = minio.test" | sudo tee "$certPath/server_cert.conf" 1> /dev/null
+
+			# Generate TLS certificate.
+			sudo openssl req \
+				-nodes \
+				-new \
+				-keyout "$certPath/private.key" \
+				-out "$certPath/server.csr" \
+				-config "$certPath/server_cert.conf"
+
+			# Sign certificate with root CA.
+			sudo openssl x509 \
+				-days 3650 \
+				-req \
+				-in "$certPath/server.csr" \
+				-CA "$livePath/chain.pem" \
+				-CAkey "$livePath/local_root.key" \
+				-set_serial "$RANDOM" \
+				-out "$certPath/public.crt" \
+				-extfile "$certPath/server_cert.conf" \
+				-extensions x509_ext
+
+			cp "$livePath/chain.pem" "$certPath/CAs"
+		fi
+
+		if ! grep "minio.test" /etc/hosts 1> /dev/null
+		then
+			echo -e " \033[1m- Setting up /etc/hosts.\033[0m"
+			echo "127.0.0.1	minio.test" | sudo tee --append /etc/hosts 1> /dev/null
+		fi
+
+		start_service docker
+		docker kill "minio_$instance" || true
+		docker rm "minio_$instance" || true
+		docker pull --quiet bitnami/minio
+
+		docker run \
+			--detach \
+			--name "minio_$instance" \
+			-p "90${index}0":"9000" \
+			-p "90${index}1":"9001" \
+			--hostname minio.test \
+			--volume "$certPath":/certs \
+			--env MINIO_ROOT_USER="nextcloud" \
+			--env MINIO_ROOT_PASSWORD="nextcloud" \
+			--env MINIO_BROWSER_REDIRECT_URL="https://minio.test:90${index}1" \
+			--env MINIO_SCHEME="https" \
+			--env MINIO_HTTP_TRACE="/dev/stdout" \
+			--env BITNAMI_DEBUG="yes" \
+			bitnami/minio
+
+		echo -e " \033[1m- Minio is available at: https://minio.test:90${index}1.\033[0m"
+
+		# if [ "${enableEncryption:-false}" == "true" ]
+		# then
+		# 	sseCKey="'sse_c_key' => ''"
+		# fi
+
+		initialConfig="$initialConfig\
+			'objectstore' => [\
+				'class' => 'OC\Files\ObjectStore\S3',\
+				'arguments' => [\
+					'bucket' => 'nextcloud',\
+					'autocreate' => true,\
+					'key' => 'nextcloud',\
+					'secret' => 'nextcloud',\
+					'hostname' => 'minio.test',\
+					'port' => 90${index}0,\
+					'use_path_style' => true,\
+					'verify_bucket_exists' => true,\
+					'use_ssl' => true,\
+					$sseCKey\
+				]\
+			],"
+	fi
+}
+
+echo -e " \033[1m- Set initial config.php.\033[0m"
+{
+	echo "<?php \$CONFIG=[$initialConfig];" > config/config.php
+}
+
+echo -e " \033[1m- Calling installation command.\033[0m"
+{
+	occ maintenance:install \
+		--no-interaction \
+		--ansi \
+		--admin-user=admin \
+		--admin-pass=password \
+		--admin-email=louis@chmn.me \
+		--database="${database:-mysql}" \
+		--database-port="$dbPort" \
+		--database-host=localhost \
+		--database-name="nextcloud_$instance" \
+		--database-user="nextcloud_$instance" \
+		--database-pass=password
+
+	echo -e " \033[1m- Enabling dev, extra and linked apps.\033[0m"
+	occ app:enable --quiet --force "${APP_LIST_DEV[@]}" "${APP_LIST_EXTRA[@]}" "${APP_LIST_LOCAL_LINK[@]}" || true
+	for app in "${APP_LIST_DEV[@]}" "${APP_LIST_EXTRA[@]}" "${APP_LIST_LOCAL_LINK[@]}"
+	do
+		echo "	- $app"
+	done
+
+	{
+		echo -e " \033[1m- Prevent Nextcloud from changing nextcloud.log's permissions.\033[0m"
+		occ --quiet config:system:set check_data_directory_permissions --value false --type boolean
+
+		echo -e " \033[1m- Disable bruteforce protection.\033[0m"
+		occ --quiet config:system:set auth.bruteforce.protection.enabled --value false --type boolean
+
+		echo -e " \033[1m- Setting trusted domains to $instanceDomain.\033[0m"
+		occ --quiet config:system:set trusted_domains 0 --value "$instanceDomain"
+
+		echo -e " \033[1m- Setting overwrite.cli.url to $instanceDomain.\033[0m"
+		occ --quiet config:system:set overwrite.cli.url --value "https://$instanceDomain"
+
+		echo -e " \033[1m- Setting extra config option to ease development.\033[0m"
+		occ --quiet config:system:set allow_local_remote_servers --type boolean --value true
+		occ security:certificates:import "/etc/letsencrypt/live/chain.pem"
+
+		echo -e " \033[1m- Setting up Redis.\033[0m"
+		occ --quiet config:system:set memcache.local --value '\OC\Memcache\Redis'
+		occ --quiet config:system:set memcache.locking --value '\OC\Memcache\Redis'
+
+		echo -e " \033[1m- Setting up AJAX cron.\033[0m"
+		occ --quiet background:ajax
+		echo -e " \033[1m- Setting up default app to 'files'.\033[0m"
+		occ --quiet config:system:set defaultapp --value files
+	} &
+	{
+		if [ "${enableLdap:-false}" == "true" ]
+		then
+			echo -e " \033[1m- Setting up LDAP.\033[0m"
+			start_service slapd
+			occ --quiet app:enable user_ldap
+			occ --quiet ldap:create-empty-config
+			occ --quiet ldap:set-config s01 ldapHost localhost &
+			occ --quiet ldap:set-config s01 ldapPort 389 &
+			occ --quiet ldap:set-config s01 ldapAgentName "cn=admin,dc=example,dc=com" &
+			occ --quiet ldap:set-config s01 ldapAgentPassword "password" &
+			occ --quiet ldap:set-config s01 ldapBase "ou=users,dc=example,dc=com" &
+			occ --quiet ldap:set-config s01 ldapBaseUsers "ou=users,dc=example,dc=com" &
+			occ --quiet ldap:set-config s01 ldapBaseGroups "ou=groups,dc=example,dc=com" &
+			occ --quiet ldap:set-config s01 ldapUserFilterObjectclass "inetOrgPerson" &
+			occ --quiet ldap:set-config s01 ldapUserFilter "(|(objectclass=inetOrgPerson))" &
+			occ --quiet ldap:set-config s01 ldapUserDisplayName "displayName" &
+			occ --quiet ldap:set-config s01 ldapExpertUsernameAttr "sn" &
+			occ --quiet ldap:set-config s01 ldapLoginFilter "(&(|(objectclass=inetOrgPerson))(|(sn=%uid)(mail=%uid)))" &
+			occ --quiet ldap:set-config s01 ldapConfigurationActive 1 &
+			occ --quiet ldap:set-config s01 ldapLoginFilterMode 1 &
+			occ --quiet ldap:set-config s01 ldapEmailAttribute mail &
+			wait
+			occ ldap:test-config s01
+		fi
+	} &
+	{
+		if [ "${enableSaml:-false}" == "true" ]
+		then
+			echo -e " \033[1m- Setting up SAML.\033[0m"
+			start_service docker
+			docker kill "saml_$instance" || true
+			docker pull --quiet "unicon/simplesamlphp"
+
+			index=${instance/server/}
+			docker run \
+				--detach \
+				--name "saml_$instance" \
+				--rm \
+				-p "8${index}80":"80" \
+				-p "8${index}43":"443" \
+				--add-host host.docker.internal:host-gateway \
+				--add-host ldap:host-gateway \
+				--add-host "$instanceDomain":host-gateway \
+				--env "VIRTUAL_HOST=localhost" \
+				--env "VIRTUAL_HOST=localhost" \
+				--volume "${workspace}/saml_config/config":/var/simplesamlphp/config \
+				--volume "${workspace}/saml_config/cert":/var/simplesamlphp/cert \
+				--volume "${workspace}/saml_config/metadata":/var/simplesamlphp/metadata \
+				unicon/simplesamlphp
+
+			occ --quiet app:enable user_saml
+			occ --quiet saml:config:create
+
+			# occ saml:config:set \
+			# 	--general-idp0_display_name "SimpleSamlPhp" \
+			# 	--general-uid_mapping "username" \
+			# 	--idp-entityId "http://keycloak.dev.local/realms/Example" \
+			# 	--idp-singleLogoutService.url "http://keycloak.dev.local/realms/Example/protocol/saml" \
+			# 	--idp-singleSignOnService.url "http://keycloak.dev.local/realms/Example/protocol/saml" \
+			# 	--idp-x509cert="$(cat keycloak.crt)" \
+			# 	--security-authnRequestsSigned 1 \
+			# 	--security-logoutRequestSigned 1 \
+			# 	--security-logoutResponseSigned 1 \
+			# 	--security-wantAssertionsEncrypted 0 \
+			# 	--security-wantAssertionsSigned 1 \
+			# 	--security-wantMessagesSigned 1 \
+			# 	--security-nameIdEncrypted 0 --security-wantNameId 0 \
+			# 	--security-wantNameIdEncrypted 0 \
+			# 	--sp-x509cert="$(cat public.cert)" \
+			# 	--sp-privateKey="$(cat private.key)" \
+			# 	"1"
+
+			occ config:app:set user_saml type --value "saml"
+			occ saml:config:set \
+				--general-idp0_display_name="Simple SAML PHP" \
+				--general-uid_mapping="urn:oid:0.9.2342.19200300.100.1.1" \
+				--idp-entityId="http://localhost:8${index}80/simplesaml/saml2/idp/metadata.php" \
+				--idp-singleSignOnService.url="http://localhost:8${index}80/simplesaml/saml2/idp/SSOService.php" \
+				--idp-singleLogoutService.url="http://localhost:8${index}80/simplesaml/saml2/idp/SingleLogoutService.php" \
+				--idp-x509cert="$(cat ${workspace}/saml_config/cert/example.org.crt)" \
+				"1"
+
+			# --sp-privateKey="$(cat ${workspace}/saml_config/cert/example.org.pem)" \
+			# occ saml:config:set --security-authnRequestsSigned="1"
+			# occ saml:config:set --security-wantAssertionsEncrypted="1"
+			# occ saml:config:set --security-wantAssertionsSigned="1"
+		fi
+	} &
+	{
+		if [ "${enableEncryption:-false}" == "true" ]
+		then
+			echo -e " \033[1m- Setting up encryption.\033[0m"
+			occ --quiet app:enable encryption
+			occ --quiet encryption:enable
+		fi
+	} &
+	{
+		if [[ "${test:-false}" == "false" ]]
+		then
+			echo -e " \033[1m- Creating dummy users Alice, Bob and Charlie.\033[0m"
+			export OC_PASS=password
+			occ --quiet user:add \
+				--no-interaction \
+				--ansi \
+				--password-from-env \
+				--display-name=Alice \
+				alice
+			occ --quiet user:add \
+				--no-interaction \
+				--ansi \
+				--password-from-env \
+				--display-name=Bob \
+				bob &
+			occ --quiet user:add \
+				--no-interaction \
+				--ansi \
+				--password-from-env \
+				--display-name=Charlie \
+				charlie &
+				wait
+		fi
+	} &
+	wait
+}
+
+
+echo -e " \033[1m- Instance is available here:.\033[0m"
+{
+	echo "	https://$instanceDomain"
+}

@@ -1,0 +1,9 @@
+#!/bin/bash
+
+set -eu
+
+# Path to the ldif file
+ldif_file=$1
+
+# Password is: password
+ldapadd -H ldapi:/// -x -D cn=admin,dc=example,dc=com -W -f "$ldif_file"

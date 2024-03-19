@@ -1,0 +1,9 @@
+#!/bin/bash
+
+set -eu
+
+# Example: "cn=Archimedes of Syracuse,ou=users,dc=example,dc=com"
+user_dn=$1
+
+# Password is: password
+ldapdelete -H ldapi:/// -x -D cn=admin,dc=example,dc=com -W "$user_dn"

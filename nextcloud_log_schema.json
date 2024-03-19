@@ -1,0 +1,95 @@
+{
+	"nextcloud_log": {
+		"title": "Display nextcloud logs",
+		"file-type": "json",
+		"timestamp-field": "time",
+		"value": {
+			"version": {
+				"kind": "string",
+				"identifier": true
+			},
+			"app": {
+				"kind": "string"
+			},
+			"reqId": {
+				"kind": "string",
+				"identifier": true
+			},
+			"remoteAddr": {
+				"kind": "string",
+				"hidden": true
+			},
+			"user": {
+				"kind": "string",
+				"hidden": true
+			},
+			"level": {
+				"kind": "integer",
+				"hidden": true
+			},
+			"method": {
+				"kind": "string"
+			},
+			"url": {
+				"kind": "string"
+			},
+			"message": {
+				"kind": "string"
+			},
+			"userAgent": {
+				"kind": "string",
+				"hidden": true
+			}
+		},
+		"line-format": [
+			{
+				"field": "reqId"
+			},
+			" - ",
+			{
+				"field": "time",
+				"timestamp-format": "%Y/%d/%m-%H:%M:%S"
+			},
+			" - ",
+			"(",
+			{
+				"field": "version"
+			},
+			")",
+			" - ",
+			"[",
+			{
+				"field": "app"
+			},
+			"]",
+			"[",
+			{
+				"field": "method",
+				"default-value": "no method"
+			},
+			"]",
+			" - ",
+			"[",
+			{
+				"field": "url"
+			},
+			"]",
+			" - ",
+			{
+				"field": "message",
+				"align": "left"
+			}
+		],
+		"level-field": "level",
+		"level": {
+			"debug": 0,
+			"info": 1,
+			"warning": 2,
+			"error": 3,
+			"fatal": 4
+		},
+		"body-field": "message",
+		"opid-field": "reqId",
+		"file-pattern": "nextcloud.log"
+	}
+}

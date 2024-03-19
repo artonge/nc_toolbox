@@ -1,0 +1,30 @@
+#!/bin/bash
+
+set -eu
+
+instance="${1:-}"
+
+workspace="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)/.."
+
+if [ "$instance" == "" ]
+then
+	mapfile -t instances < <(find "$workspace" -maxdepth 3 -name config.php)
+
+	if [ "${#instances[@]}" == "0" ]
+	then
+		echo "No instance found, exiting."
+		exit 0
+	fi
+
+	echo -e " \033[1m- Found ${#instances[@]} instances, which one do you want to link into ?\033[0m "
+
+	for i in "${!instances[@]}"
+	do
+		instance_name=$(basename "$(dirname "$(dirname "${instances[$i]}")")")
+		echo "    - $instance_name"
+	done
+
+	read -rp "> " instance
+fi
+
+find "$workspace/$instance/apps/" -maxdepth 1 -type l -exec sh -c 'echo - "$(basename "$1")"' shell {} \;

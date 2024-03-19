@@ -1,0 +1,21 @@
+#!/bin/bash
+
+set -eu
+
+current_version=$(sudo dnf module info php | grep -E 'Stream .+ \[e]' | cut -d':' -f2 | cut -d' ' -f2 | cut -d'-' -f2)
+target_version=${1:-}
+
+
+if [ "$target_version" == "" ]
+then
+	echo "Please specify a version of PHP. 7.4, 8.0, ..."
+	exit 1
+fi
+
+echo "Switching from $current_version to $target_version"
+
+# https://computingforgeeks.com/how-to-install-php-on-fedora/
+sudo dnf module -y --quiet remove "php:remi-$current_version"
+sudo dnf module -y --quiet reset "php:remi-$current_version"
+sudo dnf module -y --quiet install "php:remi-$target_version"
+sudo dnf reinstall -y --quiet blackfire-php

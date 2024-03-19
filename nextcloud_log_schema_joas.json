@@ -1,0 +1,82 @@
+{
+    "nextcloud_log" : {
+        "title" : "Nextcloud Log Format",
+        "description" : "Log format used nextcloud.log files.",
+        "hide-extra": true,
+        "multiline": false,
+        "json" : true,
+        "file-pattern" : "\\.log",
+        "level-field" : "level",
+        "level": {
+            "fatal" : 4,
+            "error" : 3,
+            "warning" : 2,
+            "info": 1,
+            "debug": 0
+        },
+        "value": {
+            "level" : {
+                "kind" : "integer",
+                "identifier": true
+            },
+            "time" : {
+                "kind" : "string"
+            },
+            "app" : {
+                "kind" : "string",
+                "identifier" : true
+            }
+        },
+        "value-to-be-moved-up-when-wanted": {
+            "reqId" : {
+                "kind" : "string",
+                "identifier" : true
+            },
+            "remoteAddr" : {
+                "kind" : "string",
+                "identifier" : true
+            },
+            "user" : {
+                "kind" : "string",
+                "identifier" : true
+            },
+            "method" : {
+                "kind" : "string"
+            },
+            "url" : {
+                "kind" : "string"
+            },
+            "userAgent" : {
+                "kind" : "string"
+            },
+            "version" : {
+                "kind" : "string"
+            }
+        },
+        "timestamp-field": "time",
+        "timestamp-format": "%Y-%m-%dT%H:%M:%S%z",
+        "convert-to-local-time" : true,
+        "body-field" : "message",
+        "opid-field" : "reqId",
+        "module-field" : "app",
+        "line-format" : [
+            "[",
+            {
+                "field" : "__level__",
+                "min-width": 5,
+                "max-width": 5
+            },
+            "] ",
+            { "field" : "__timestamp__" },
+            " ",
+            {
+                "field" : "app",
+                "min-width": 16,
+                "max-width": 16,
+                "overflow": "truncate"
+            },
+            " ",
+            { "field" : "message", "default-value": "" }
+        ]
+    }
+}
