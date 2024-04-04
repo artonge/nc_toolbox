@@ -5,9 +5,9 @@ set -eu
 function start_service {
 
 	service=$1
-	if ! systemctl is-active $service
+	if ! systemctl is-active --quiet "$service"
 	then
-		sudo systemctl start $service
+		sudo systemctl start "$service"
 	fi
 }
 
