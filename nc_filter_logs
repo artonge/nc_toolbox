@@ -1,0 +1,65 @@
+#!/bin/bash
+
+set -eu
+
+level=0
+content=''
+notcontent=''
+method='.+'
+
+# Parse options.
+{
+	TEMP=$(getopt --longoptions 'level,content,notcontent,method' --name argError --options 'l:c:n:m:' -- "$@")
+	eval set -- "$TEMP"
+	unset TEMP
+	while true; do
+		case "$1" in
+			'-l'|'--level')
+				level=$2
+				shift 2
+				continue
+			;;
+			'-c'|'--content')
+				content=$2
+				shift 2
+				continue
+			;;
+			'-n'|'--notcontent')
+				notcontent=$2
+				shift 2
+				continue
+			;;
+			'-m'|'--method')
+				method=$2
+				shift 2
+				continue
+			;;
+			'-h'|'--help')
+				help_string=""
+				help_string+='nc_filter_logs'$'\n'
+				help_string+='	-l --level <0,1,2,3> | Filter by level.'$'\n'
+				help_string+='	-c --content <content> | Filter by content.'$'\n'
+				help_string+='	-n --notcontent <content> | Inverted filter by content.'$'\n'
+				help_string+='	-m --method <content> | Filter by method.'$'\n'
+				help_string+='	-h --help | Display this help content.'$'\n'
+				echo "$help_string" | column -t -s "|"
+				exit 0
+			;;
+			'--')
+				break
+			;;
+			*)
+				echo "Extra arg: $1"
+				shift 2
+				continue
+			;;
+		esac
+	done
+}
+
+if [ "$notcontent" = '' ]
+then
+	grep "level\":$level" | grep -E "method\":\"$method" | grep "$content"
+else
+	grep "level\":$level" | grep -E "method\":\"$method" | grep "$content" | grep -v "$notcontent"
+fi
