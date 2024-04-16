@@ -761,6 +761,8 @@ echo -e " \033[1m- Calling installation command.\033[0m"
 
 		echo -e " \033[1m- Setting up AJAX cron.\033[0m"
 		occ --quiet background:ajax
+		occ --quiet config:system:set maintenance_window_start --type=integer --value=1
+
 		echo -e " \033[1m- Setting up default app to 'files'.\033[0m"
 		occ --quiet config:system:set defaultapp --value files
 	} &
