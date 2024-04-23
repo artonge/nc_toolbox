@@ -2,4 +2,43 @@
 
 set -eu
 
-jq -r '.reqId + " - " + (.time | strptime("%Y-%m-%dT%H:%M:%S+%S:%S") | mktime | strftime("%Y-%m-%d %H:%M")) + " " + "[" + .user + "]" + " " + .method + " " + .url + " - " + .message | sub("\n"; " - "; "g")'
+groupby=''
+
+# Parse options.
+{
+	TEMP=$(getopt --longoptions 'groupby,help' --name argError --options 'g:h' -- "$@")
+	eval set -- "$TEMP"
+	unset TEMP
+	while true; do
+		case "$1" in
+			'-g'|'--groupby')
+				groupby=$2
+				shift 2
+				continue
+			;;
+			'-h'|'--help')
+				help_string=""
+				help_string+='nc_filter_logs'$'\n'
+				help_string+='	-g --groupby <propery_name> | Group logs by the given property.'$'\n'
+				help_string+='	-h --help | Display this help content.'$'\n'
+				echo "$help_string" | column -t -s "|"
+				exit 0
+			;;
+			'--')
+				break
+			;;
+			*)
+				echo "Extra arg: $1"
+				shift 2
+				continue
+			;;
+		esac
+	done
+}
+
+if [ $groupby = '' ]
+then
+	jq -r '.reqId + " - " + (.time | strptime("%Y-%m-%dT%H:%M:%S+%S:%S") | mktime | strftime("%Y-%m-%d %H:%M")) + " " + "[" + .user + "]" + " " + .method + " " + .url + " - " + .message | sub("\n"; " - "; "g")' | less -SEX
+else
+	jq --slurp 'group_by(.'$groupby') | sort_by(.[0].time) | .[][0] | .reqId + " - " + (.time | strptime("%Y-%m-%dT%H:%M:%S+%S:%S") | mktime | strftime("%Y-%m-%d %H:%M")) + " " + "[" + .user + "]" + " " + .method + " " + .url + " - " + .message | sub("\n"; " - "; "g")' | less -SEX
+fi

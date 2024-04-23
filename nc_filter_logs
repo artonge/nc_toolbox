@@ -9,7 +9,7 @@ method='.+'
 
 # Parse options.
 {
-	TEMP=$(getopt --longoptions 'level,content,notcontent,method' --name argError --options 'l:c:n:m:' -- "$@")
+	TEMP=$(getopt --longoptions 'level,content,notcontent,method,help' --name argError --options 'l:c:n:m:h' -- "$@")
 	eval set -- "$TEMP"
 	unset TEMP
 	while true; do
