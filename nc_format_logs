@@ -36,7 +36,7 @@ groupby=''
 	done
 }
 
-if [ $groupby = '' ]
+if [ "$groupby" = '' ]
 then
 	jq -r '.reqId + " - " + (.time | strptime("%Y-%m-%dT%H:%M:%S+%S:%S") | mktime | strftime("%Y-%m-%d %H:%M")) + " " + "[" + .user + "]" + " " + .method + " " + .url + " - " + .message | sub("\n"; " - "; "g")' | less -SEX
 else
