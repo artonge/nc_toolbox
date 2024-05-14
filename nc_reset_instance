@@ -201,6 +201,7 @@ done
 	APP_LIST_SHIPPED+=(survey_client)
 	APP_LIST_SHIPPED+=(text)
 	APP_LIST_SHIPPED+=(viewer)
+	APP_LIST_SHIPPED+=(bruteforcesettings)
 
 	APP_LIST_SHIPPED_ENTERPRISE=()
 	APP_LIST_SHIPPED_ENTERPRISE+=(support)
