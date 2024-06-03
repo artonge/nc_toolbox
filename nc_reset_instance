@@ -187,7 +187,7 @@ done
 	APP_LIST_SHIPPED=()
 	APP_LIST_SHIPPED+=(activity)
 	APP_LIST_SHIPPED+=(files_pdfviewer)
-	APP_LIST_SHIPPED+=(files_rightclick)
+	# APP_LIST_SHIPPED+=(files_rightclick)
 	# APP_LIST_SHIPPED+=(files_videoplayer) DEPRECATED
 	APP_LIST_SHIPPED+=(firstrunwizard)
 	APP_LIST_SHIPPED+=(logreader)
