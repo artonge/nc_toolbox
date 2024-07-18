@@ -59,7 +59,7 @@ method='.+'
 
 if [ "$notcontent" = '' ]
 then
-	grep "level\":$level" | grep -E "method\":\"$method" | grep --color "$content"
+	grep --text "level\":$level" | grep --text -E "method\":\"$method" | grep --text --color "$content"
 else
-	grep "level\":$level" | grep -E "method\":\"$method" | grep -v "$notcontent" | grep --color "$content"
+	grep --text "level\":$level" | grep --text -E "method\":\"$method" | grep --text -v "$notcontent" | grep --text --color "$content"
 fi
