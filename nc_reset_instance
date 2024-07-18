@@ -671,17 +671,17 @@ echo -e " \033[1m- Recreating ${database:-mysql} database.\033[0m"
 		docker rm "minio_$instance" || true
 		docker pull --quiet bitnami/minio
 
+			# --volume "$certPath":/certs \
 		docker run \
 			--detach \
 			--name "minio_$instance" \
 			-p "90${index}0":"9000" \
 			-p "90${index}1":"9001" \
 			--hostname minio.test \
-			--volume "$certPath":/certs \
 			--env MINIO_ROOT_USER="nextcloud" \
 			--env MINIO_ROOT_PASSWORD="nextcloud" \
-			--env MINIO_BROWSER_REDIRECT_URL="https://minio.test:90${index}1" \
-			--env MINIO_SCHEME="https" \
+			--env MINIO_BROWSER_REDIRECT_URL="http://minio.test:90${index}1" \
+			--env MINIO_SCHEME="http" \
 			--env MINIO_HTTP_TRACE="/dev/stdout" \
 			--env BITNAMI_DEBUG="yes" \
 			bitnami/minio
@@ -705,7 +705,7 @@ echo -e " \033[1m- Recreating ${database:-mysql} database.\033[0m"
 					'port' => 90${index}0,\
 					'use_path_style' => true,\
 					'verify_bucket_exists' => true,\
-					'use_ssl' => true,\
+					'use_ssl' => false,\
 					$sseCKey\
 				]\
 			],"
