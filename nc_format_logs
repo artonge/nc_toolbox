@@ -36,9 +36,12 @@ groupby=''
 	done
 }
 
+jq_format_script='.reqId + " - " + (.level | tostring) + " - " + (.time | strptime("%Y-%m-%dT%H:%M:%S+%S:%S") | mktime | strftime("%Y-%m-%d %H:%M")) + " " + "[" + .user + "]" + " " + .method + " " + .url + " - " + .message | sub("\n"; " - "; "g")'
+
 if [ "$groupby" = '' ]
 then
-	jq -r '.reqId + " - " + (.level | tostring) + " - " + (.time | strptime("%Y-%m-%dT%H:%M:%S+%S:%S") | mktime | strftime("%Y-%m-%d %H:%M")) + " " + "[" + .user + "]" + " " + .method + " " + .url + " - " + .message | sub("\n"; " - "; "g")' | less -SEX
+	jq -r "$jq_format_script" | less -SEX
 else
-	jq --slurp 'group_by(.'$groupby') | sort_by(.[0].time) | (.[] | length | tostring) + " - " + (.[][0] | .reqId + " - " + (.level | tostring) + " - " + (.time | strptime("%Y-%m-%dT%H:%M:%S+%S:%S") | mktime | strftime("%Y-%m-%d %H:%M")) + " " + "[" + .user + "]" + " " + .method + " " + .url + " - " + .message | sub("\n"; " - "; "g"))' | less -SEX
+	jq_group_by_script='group_by(.'$groupby') | sort_by(.[0].time) | (.[] | length | tostring)'
+	jq --slurp "$jq_group_by_script"' + " - " + (.[][0] | '"$jq_format_script"')' | less -SEX
 fi
