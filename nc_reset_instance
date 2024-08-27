@@ -56,7 +56,8 @@ done
 	fi
 
 	instancePath="$instancesPath/$instance"
-	instanceDomain="nextcloud_$instance.test"
+	instanceID="nextcloud_$instance"
+	instanceDomain="nextcloud-$instance.test"
 
 	if [ "$targetVersion" == "" ]
 	then
@@ -278,7 +279,7 @@ done
 # TLS certificates.
 {
 	livePath="/etc/letsencrypt/live"
-	certPath="$livePath/nextcloud_$instance"
+	certPath="$livePath/$instanceDomain"
 
 	# Prevent overriding existing root CA.
 	if [ ! -f "$livePath/chain.pem" ]
@@ -368,7 +369,7 @@ done
 	if [ ! -f "/etc/nginx/conf.d/$instanceDomain.conf" ]
 	then
 		echo -e " \033[1m- Setting up Nginx.\033[0m"
-		envsubst "\$instance" < /etc/nginx/conf.d/nextcloud.test.conf.template | sudo tee "/etc/nginx/conf.d/$instanceDomain.conf" 1> /dev/null
+		envsubst "\$instance" < $workspace/engineering/nextcloud.test.conf.template | sudo tee "/etc/nginx/conf.d/$instanceDomain.conf" 1> /dev/null
 		sudo systemctl restart nginx
 	fi
 }
@@ -581,23 +582,23 @@ echo -e " \033[1m- Recreating ${database:-mysql} database.\033[0m"
 		start_service mariadb
 		dbPort=3306
 		sudo -u mysql mysql <<-EOSQL
-			DROP DATABASE IF EXISTS nextcloud_$instance;
-			DROP USER IF EXISTS nextcloud_$instance;
+			DROP DATABASE IF EXISTS $instanceID;
+			DROP USER IF EXISTS $instanceID;
 
-			CREATE USER nextcloud_$instance IDENTIFIED BY 'password';
-			CREATE DATABASE nextcloud_$instance;
-			GRANT ALL PRIVILEGES ON nextcloud_$instance.* TO nextcloud_$instance identified by 'password';
+			CREATE USER $instanceID IDENTIFIED BY 'password';
+			CREATE DATABASE $instanceID;
+			GRANT ALL PRIVILEGES ON $instanceID.* TO $instanceID identified by 'password';
 		EOSQL
 	elif [ "${database:-mysql}" == "pgsql" ]
 	then
 		start_service postgresql
 		dbPort=5432
 		sudo -u postgres psql -v ON_ERROR_STOP=1 <<-EOSQL
-			DROP DATABASE IF EXISTS nextcloud_$instance;
-			DROP ROLE IF EXISTS nextcloud_$instance;
+			DROP DATABASE IF EXISTS $instanceID;
+			DROP ROLE IF EXISTS $instanceID;
 
-			CREATE USER nextcloud_$instance WITH ENCRYPTED PASSWORD 'password';
-			CREATE DATABASE nextcloud_$instance WITH OWNER nextcloud_$instance;
+			CREATE USER $instanceID WITH ENCRYPTED PASSWORD 'password';
+			CREATE DATABASE $instanceID WITH OWNER $instanceID;
 		EOSQL
 	else
 		echo "Database must be 'mysql' or 'pgsql'"
@@ -728,8 +729,8 @@ echo -e " \033[1m- Calling installation command.\033[0m"
 		--database="${database:-mysql}" \
 		--database-port="$dbPort" \
 		--database-host=localhost \
-		--database-name="nextcloud_$instance" \
-		--database-user="nextcloud_$instance" \
+		--database-name="$instanceID" \
+		--database-user="$instanceID" \
 		--database-pass=password
 
 	echo -e " \033[1m- Enabling dev, extra and linked apps.\033[0m"
@@ -894,7 +895,7 @@ echo -e " \033[1m- Calling installation command.\033[0m"
 }
 
 
-echo -e " \033[1m- Instance is available here:.\033[0m"
+echo -e " \033[1m- Instance is available here:\033[0m"
 {
 	echo "	https://$instanceDomain"
 }
