@@ -421,12 +421,14 @@ echo -e " \033[1m- Setting up files for instance $instance on $targetVersion.\03
 	# Asynchronously pull new changes for server.
 	if [ "${offline:-false}" == "false" ]
 	then
-		# Do not pull if we are on a tag
-		if ! git -C "$instancePath" describe --exact-match --tags HEAD >/dev/null 2>&1;
-		then
-			git -C "$instancePath" pull --quiet &
-		fi
-		git -C "$instancePath" submodule --quiet update --init &
+		{
+			# Do not pull if we are on a tag
+			if ! git -C "$instancePath" describe --exact-match --tags HEAD >/dev/null 2>&1;
+			then
+				git -C "$instancePath" pull --quiet
+			fi
+			git -C "$instancePath" submodule --quiet update --init
+ 		} &
 	fi
 }
 
@@ -540,8 +542,8 @@ echo -e " \033[1m- Setting up apps.\033[0m"
 				composer --quiet --working-dir "$instancePath/apps-extra/$app" install &
 			} || echo "Failed to update $app"
 		else
-			composer dumpautoload --quiet &
-		fi
+			composer dumpautoload --quiet --working-dir "$instancePath/apps-extra/$app"
+		fi & # Parallelize setup_app
 	}
 
 	echo -e "	- Removing linked applications."
