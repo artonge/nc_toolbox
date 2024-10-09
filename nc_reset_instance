@@ -212,6 +212,7 @@ done
 	APP_LIST_DEV+=(hmr_enabler)
 	APP_LIST_DEV+=(profiler)
 	APP_LIST_DEV+=(previewgenerator)
+	APP_LIST_DEV+=(ocs_api_viewer)
 
 	APP_LIST_SUPPORTED=()
 	# Files subscription
