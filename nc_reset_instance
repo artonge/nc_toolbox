@@ -507,7 +507,7 @@ echo -e " \033[1m- Setting up apps.\033[0m"
 			return
 		fi
 
-		printf "		- $app ...\r"
+		printf "		- %s ...\r" "$app"
 
 		if [ ! -e "$instancePath/apps-extra/$app" ]
 		then
