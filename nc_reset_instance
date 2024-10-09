@@ -629,13 +629,12 @@ echo -e " \033[1m- Recreating ${database:-mysql} database.\033[0m"
 	then
 		start_service mariadb
 		dbPort=3306
-		sudo -u mysql mysql <<-EOSQL
+		mysql <<-EOSQL
 			DROP DATABASE IF EXISTS $instanceID;
-			DROP USER IF EXISTS $instanceID;
-
-			CREATE USER $instanceID IDENTIFIED BY 'password';
 			CREATE DATABASE $instanceID;
-			GRANT ALL PRIVILEGES ON $instanceID.* TO $instanceID identified by 'password';
+
+			CREATE USER IF NOT EXISTS nextcloud IDENTIFIED BY 'password';
+			GRANT ALL PRIVILEGES ON $instanceID.* TO nextcloud identified by 'password';
 		EOSQL
 	elif [ "${database:-mysql}" == "pgsql" ]
 	then
@@ -778,7 +777,7 @@ echo -e " \033[1m- Calling installation command.\033[0m"
 		--database-port="$dbPort" \
 		--database-host=localhost \
 		--database-name="$instanceID" \
-		--database-user="$instanceID" \
+		--database-user="nextcloud" \
 		--database-pass=password
 
 	echo -e " \033[1m- Enabling dev, extra and linked apps.\033[0m"
