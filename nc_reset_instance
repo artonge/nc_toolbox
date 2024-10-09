@@ -404,18 +404,18 @@ echo -e " \033[1m- Setting up files for instance $instance on $targetVersion.\03
 
 	if [[ "${fetchRepo:-false}" == "true" && "${offline:-false}" == "false" ]]
 	then
-		git fetch --force --tags --prune --prune-tags --recurse-submodules --quiet
+		git -C "$instancePath" fetch --force --tags --prune --prune-tags --recurse-submodules --quiet
 	fi
 
-	git checkout --quiet .htaccess
+	git -C "$instancePath" checkout --quiet .htaccess
 
 	if [ "${checkoutTo:-}" != "" ]
 	then
 		echo -e "	- Checking out $checkoutTo."
-		git checkout --quiet --recurse-submodules "$checkoutTo"
+		git -C "$instancePath" checkout --quiet --recurse-submodules "$checkoutTo"
 	else
 		echo -e "	- Checking out $targetVersion."
-		git checkout --quiet --recurse-submodules "$targetVersion"
+		git -C "$instancePath" checkout --quiet --recurse-submodules "$targetVersion"
 	fi
 
 	mkdir --parent "$instancePath/apps-extra"
@@ -424,11 +424,11 @@ echo -e " \033[1m- Setting up files for instance $instance on $targetVersion.\03
 	if [ "${offline:-false}" == "false" ]
 	then
 		# Do not pull if we are on a tag
-		if ! git describe --exact-match --tags HEAD >/dev/null 2>&1;
+		if ! git -C "$instancePath" describe --exact-match --tags HEAD >/dev/null 2>&1;
 		then
-			git pull --quiet &
+			git -C "$instancePath" pull --quiet &
 		fi
-		git submodule --quiet update --init &
+		git -C "$instancePath" submodule --quiet update --init &
 	fi
 }
 
