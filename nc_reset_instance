@@ -449,6 +449,53 @@ echo -e " \033[1m- Setting up apps.\033[0m"
 			],
 		],"
 
+	function parse_git_branch() {
+		repo="$1"
+		branch=$(git -C "$repo" branch 2> /dev/null | sed -e '/^[^*]/d' -e 's/* \(.*\)/\1/')
+		if [ ! "${branch}" == "" ]
+		then
+			echo "${branch}$(parse_git_dirty "$repo")"
+		else
+			echo ""
+		fi
+	}
+
+	# get current status of git repo
+	function parse_git_dirty {
+		repo="$1"
+		status=$(git -C "$repo" status 2>&1 | tee)
+		dirty=$(echo -n "${status}" 2> /dev/null | grep "modified:" &> /dev/null; echo "$?")
+		untracked=$(echo -n "${status}" 2> /dev/null | grep "Untracked files" &> /dev/null; echo "$?")
+		ahead=$(echo -n "${status}" 2> /dev/null | grep "Your branch is ahead of" &> /dev/null; echo "$?")
+		newFile=$(echo -n "${status}" 2> /dev/null | grep "new file:" &> /dev/null; echo "$?")
+		renamed=$(echo -n "${status}" 2> /dev/null | grep "renamed:" &> /dev/null; echo "$?")
+		deleted=$(echo -n "${status}" 2> /dev/null | grep "deleted:" &> /dev/null; echo "$?")
+		bits=''
+		if [ "${renamed}" == "0" ]; then
+			bits=">${bits}"
+		fi
+		if [ "${ahead}" == "0" ]; then
+			bits="*${bits}"
+		fi
+		if [ "${newFile}" == "0" ]; then
+			bits="+${bits}"
+		fi
+		if [ "${untracked}" == "0" ]; then
+			bits="?${bits}"
+		fi
+		if [ "${deleted}" == "0" ]; then
+			bits="x${bits}"
+		fi
+		if [ "${dirty}" == "0" ]; then
+			bits="!${bits}"
+		fi
+		if [ ! "${bits}" == "" ]; then
+			echo " ${bits}"
+		else
+			echo ""
+		fi
+	}
+
 	function setup_app() {
 		app="$1"
 		clone_url="$2"
@@ -482,7 +529,7 @@ echo -e " \033[1m- Setting up apps.\033[0m"
 		git -C "$instancePath/apps-extra/$app" checkout --quiet "main" ||
 		git -C "$instancePath/apps-extra/$app" checkout --quiet "master"
 
-		echo "		- $app ($(git -C "$instancePath/apps-extra/$app" rev-parse --abbrev-ref HEAD))"
+		echo "		- $app ($(parse_git_branch "$instancePath/apps-extra/$app"))"
 
 		# Asynchronously pull new changes for the app.
 		if [ "${offline:-false}" == "false" ]
