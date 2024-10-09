@@ -393,8 +393,6 @@ echo -e " \033[1m- Setting up files for instance $instance on $targetVersion.\03
 		git clone --quiet "${repository:-git@github.com:nextcloud/server.git}" "$instancePath"
 	fi
 
-	cd "$instancePath"
-
 	if [ "${updateOnly:-false}" = "false" ]
 	then
 		echo -e "	- Deleting data and configuration."
@@ -611,6 +609,8 @@ echo -e " \033[1m- Setting up apps.\033[0m"
 
 	wait
 }
+
+cd "$instancePath"
 
 # Early exit if update only.
 {
