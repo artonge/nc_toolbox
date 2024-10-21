@@ -656,7 +656,12 @@ echo -e " \033[1m- Recreating ${database:-mysql} database.\033[0m"
 	if [ "${enableS3Bucket:-false}" == "true" ]
 	then
 		echo -e " \033[1m- Setting up S3 bucket.\033[0m"
-		index=${instance/server/}
+		if [ "$instance" = 'test' ]
+		then
+			index='11'
+		else
+			index=$(cat "$instancePath/version.php" | grep '$OC_Version ' | grep -Eo '([0-9][0-9])')
+		fi
 		sseCKey=""
 		certPath="/etc/letsencrypt/live/nextcloud_minio"
 
@@ -721,18 +726,18 @@ echo -e " \033[1m- Recreating ${database:-mysql} database.\033[0m"
 		docker run \
 			--detach \
 			--name "minio_$instance" \
-			-p "90${index}0":"9000" \
-			-p "90${index}1":"9001" \
+			-p "9${index}0":"9000" \
+			-p "9${index}1":"9001" \
 			--hostname minio.test \
 			--env MINIO_ROOT_USER="nextcloud" \
 			--env MINIO_ROOT_PASSWORD="nextcloud" \
-			--env MINIO_BROWSER_REDIRECT_URL="http://minio.test:90${index}1" \
+			--env MINIO_BROWSER_REDIRECT_URL="http://minio.test:9${index}1" \
 			--env MINIO_SCHEME="http" \
 			--env MINIO_HTTP_TRACE="/dev/stdout" \
 			--env BITNAMI_DEBUG="yes" \
 			bitnami/minio
 
-		echo -e " \033[1m- Minio is available at: https://minio.test:90${index}1.\033[0m"
+		echo -e " \033[1m- Minio is available at: https://minio.test:9${index}1.\033[0m"
 
 		# if [ "${enableEncryption:-false}" == "true" ]
 		# then
@@ -748,7 +753,7 @@ echo -e " \033[1m- Recreating ${database:-mysql} database.\033[0m"
 					'key' => 'nextcloud',\
 					'secret' => 'nextcloud',\
 					'hostname' => 'minio.test',\
-					'port' => 90${index}0,\
+					'port' => 9${index}0,\
 					'use_path_style' => true,\
 					'verify_bucket_exists' => true,\
 					'use_ssl' => false,\
