@@ -157,7 +157,7 @@ done
 				help_string+='	-c --checkout | Checkout the given branch or tag for server.'$'\n'
 				help_string+='	-b --bucket | Enable S3 bucket.'$'\n'
 				help_string+='	-f --fetch | Fetch repositories before checkout the branch.'$'\n'
-				help_string+='	-d --database <mysql,pgsql> | Set the database to use. Default: mysql.'$'\n'
+				help_string+='	-d --database <mysql,pgsql,sqlite> | Set the database to use. Default: mysql.'$'\n'
 				help_string+='	-l --ldap | Enable ldap.'$'\n'
 				help_string+='	-e --encryption | Enable encryption.'$'\n'
 				help_string+='	-a --extra-app <app-name> | Enable given application. Can be submitted multiple times.'$'\n'
@@ -642,8 +642,12 @@ echo -e " \033[1m- Recreating ${database:-mysql} database.\033[0m"
 			CREATE USER $instanceID WITH ENCRYPTED PASSWORD 'password';
 			CREATE DATABASE $instanceID WITH OWNER $instanceID;
 		EOSQL
+	elif [ "${database:-mysql}" == "sqlite" ]
+	then
+		dbPort=0
+		rm -f "$instancePath/db.sqlite"
 	else
-		echo "Database must be 'mysql' or 'pgsql'"
+		echo "Database must be 'mysql', 'pgsql' or 'sqlite'"
 		exit 1
 	fi
 }
