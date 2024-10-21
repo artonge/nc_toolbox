@@ -635,12 +635,11 @@ echo -e " \033[1m- Recreating ${database:-mysql} database.\033[0m"
 	then
 		start_service postgresql
 		dbPort=5432
-		sudo -u postgres psql -v ON_ERROR_STOP=1 <<-EOSQL
-			DROP DATABASE IF EXISTS $instanceID;
-			DROP ROLE IF EXISTS $instanceID;
+		psql -d postgres -v ON_ERROR_STOP=1 <<-EOSQL
+			-- CREATE USER $instanceID WITH ENCRYPTED PASSWORD 'password';
 
-			CREATE USER $instanceID WITH ENCRYPTED PASSWORD 'password';
-			CREATE DATABASE $instanceID WITH OWNER $instanceID;
+			DROP DATABASE IF EXISTS $instanceID;
+			CREATE DATABASE $instanceID WITH OWNER nextcloud;
 		EOSQL
 	elif [ "${database:-mysql}" == "sqlite" ]
 	then
