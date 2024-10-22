@@ -928,6 +928,8 @@ echo -e " \033[1m- Calling installation command.\033[0m"
 	wait
 }
 
+git -C "$instancePath" checkout --quiet .htaccess
+git -C "$instancePath" checkout --quiet lib/composer
 
 echo -e " \033[1m- Instance is available here:\033[0m"
 {
