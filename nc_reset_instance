@@ -566,6 +566,7 @@ echo -e " \033[1m- Setting up apps.\033[0m"
 		setup_app "$app" "git@github.com:nextcloud/$app.git"
 	done
 
+	echo -e "	- Setting up default enterprise applications."
 	for app in "${APP_LIST_SHIPPED_ENTERPRISE[@]}"
 	do
 		setup_app "$app" "git@github.com:nextcloud-gmbh/$app.git"
@@ -759,8 +760,8 @@ echo -e " \033[1m- Calling installation command.\033[0m"
 		--database-pass=password
 
 	echo -e " \033[1m- Enabling dev, extra apps.\033[0m"
-	occ app:enable --quiet --force "${APP_LIST_DEV[@]}" "${APP_LIST_EXTRA[@]}" || true
-	for app in "${APP_LIST_DEV[@]}" "${APP_LIST_EXTRA[@]}"
+	occ app:enable --quiet --force "${APP_LIST_DEV[@]}" "${APP_LIST_EXTRA[@]}" "${APP_LIST_SHIPPED_ENTERPRISE[@]}" || true
+	for app in "${APP_LIST_DEV[@]}" "${APP_LIST_EXTRA[@]}" "${APP_LIST_SHIPPED_ENTERPRISE[@]}"
 	do
 		echo "	- $app"
 	done
