@@ -32,7 +32,7 @@ done
 # Parse arguments.
 {
 	export instance="${1:-}"
-	targetVersion="${2:-master}"
+	targetVersion="${2:-$instance}"
 
 	if [ "$instance" == "" ]
 	then
@@ -390,7 +390,7 @@ echo -e " \033[1m- Setting up files for instance $instance on $targetVersion.\03
 {
 	if [ ! -e "$instancePath" ]
 	then
-		git clone --quiet "${repository:-git@github.com:nextcloud/server.git}" "$instancePath"
+		git -C "$instancesPath/server1" worktree add "$instancePath" "$targetVersion"
 	fi
 
 	if [ "${updateOnly:-false}" = "false" ]
@@ -511,23 +511,16 @@ echo -e " \033[1m- Setting up apps.\033[0m"
 
 		if [ ! -e "$instancePath/apps-extra/$app" ]
 		then
-			if [ -e "$workspace/apps/$app" ]
+			if [ ! -e "$workspace/apps/$app" ]
 			then
-				rsync -az "$workspace/apps/$app/" "$instancePath/apps-extra/$app"
-			else
-				git clone --quiet "$clone_url" "$instancePath/apps-extra/$app" > /dev/null
+				git clone --quiet "$clone_url" "$workspace/apps/$app" > /dev/null
 			fi
-		fi
 
-		if [[ "${fetchRepo:-false}" == "true" && "${offline:-false}" == "false" ]]
-		then
-			git -C "$instancePath/apps-extra/$app" fetch --force --tags --prune --prune-tags --recurse-submodules --quiet
+			git -C "$workspace/apps/$app" fetch --force --tags --prune --prune-tags --recurse-submodules --quiet
+			git -C "$workspace/apps/$app" worktree add --quiet -f "$instancePath/apps-extra/$app" "$version" ||
+			git -C "$workspace/apps/$app" worktree add --quiet -f "$instancePath/apps-extra/$app" "main" ||
+			git -C "$workspace/apps/$app" worktree add --quiet -f "$instancePath/apps-extra/$app" "master"
 		fi
-
-		# Default to main or master if the target does not exists.
-		git -C "$instancePath/apps-extra/$app" checkout --quiet "$version" ||
-		git -C "$instancePath/apps-extra/$app" checkout --quiet "main" ||
-		git -C "$instancePath/apps-extra/$app" checkout --quiet "master"
 
 		echo "		- $app ($(parse_git_branch "$instancePath/apps-extra/$app"))"
 
@@ -536,7 +529,7 @@ echo -e " \033[1m- Setting up apps.\033[0m"
 		then
 			{
 				{
-					git -C "$instancePath/apps-extra/$app" fetch --quiet
+					git -C "$instancePath/apps-extra/$app" fetch --force --tags --prune --prune-tags --recurse-submodules --quiet
 					git -C "$instancePath/apps-extra/$app" pull --quiet
 				} &
 				composer --quiet --working-dir "$instancePath/apps-extra/$app" install &

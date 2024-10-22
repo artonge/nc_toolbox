@@ -52,7 +52,10 @@ then
 	git -C "$workspace/apps/$app" fetch --force --tags --prune --prune-tags --recurse-submodules --quiet
 fi
 
-rm -rf "$workspace/instances/$instance/apps-extra/$app"
-ln -sf "$workspace/apps/$app" "$workspace/instances/$instance/apps-extra/$app"
+if [ ! -d "$workspace/instances/$instance/apps-extra/$app" ]
+then
+	git -C "$workspace/apps/$app" worktree add --force "$workspace/instances/$instance/apps-extra/$app" "$instance"
+fi
 
 cd "$workspace/instances/$instance"
+php ./occ app:enable "$app"
