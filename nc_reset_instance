@@ -933,6 +933,7 @@ git -C "$instancePath" checkout --quiet .htaccess
 git -C "$instancePath" checkout --quiet lib/composer
 
 echo -e " \033[1m- Instance is available here:\033[0m"
-{
-	echo "	https://$instanceDomain"
-}
+echo "	https://$instanceDomain"
+
+echo -e " \033[1m- Running cron job\033[0m"
+php ./cron.php &
