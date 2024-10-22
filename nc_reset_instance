@@ -792,6 +792,9 @@ echo -e " \033[1m- Calling installation command.\033[0m"
 
 		echo -e " \033[1m- Setting up default app to 'files'.\033[0m"
 		occ --quiet config:system:set defaultapp --value files
+
+		echo -e " \033[1m- Setting up instance name to '${checkoutTo:-targetVersion}'.\033[0m"
+		occ --quiet config:app:set theming name --value "${checkoutTo:-targetVersion}"
 	} &
 	{
 		if [ "${enableLdap:-false}" == "true" ]
