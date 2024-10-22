@@ -188,13 +188,13 @@ done
 	APP_LIST_SHIPPED=()
 	APP_LIST_SHIPPED+=(activity)
 	APP_LIST_SHIPPED+=(files_pdfviewer)
-	# APP_LIST_SHIPPED+=(files_rightclick)
+	# APP_LIST_SHIPPED+=(files_rightclick) NOT NEEDED ANYMORE
 	# APP_LIST_SHIPPED+=(files_videoplayer) DEPRECATED
 	APP_LIST_SHIPPED+=(firstrunwizard)
 	APP_LIST_SHIPPED+=(logreader)
 	APP_LIST_SHIPPED+=(nextcloud_announcements)
 	APP_LIST_SHIPPED+=(notifications)
-	# APP_LIST_SHIPPED+=(password_policy)
+	APP_LIST_SHIPPED+=(password_policy)
 	APP_LIST_SHIPPED+=(photos)
 	APP_LIST_SHIPPED+=(privacy)
 	APP_LIST_SHIPPED+=(recommendations)
@@ -912,6 +912,12 @@ echo -e " \033[1m- Calling installation command.\033[0m"
 	{
 		if [[ "${test:-false}" == "false" ]]
 		then
+			echo -e " \033[1m- Setting up password policy.\033[0m"
+			occ --quiet config:app:set password_policy minLength --value 5 &
+			occ --quiet config:app:set password_policy enforceHaveIBeenPwned --value 0 &
+			occ --quiet config:app:set password_policy enforceNonCommonPassword --value 0 &
+			wait
+
 			echo -e " \033[1m- Creating dummy users Alice, Bob and Charlie.\033[0m"
 			export OC_PASS=password
 			occ --quiet user:add \
@@ -919,7 +925,7 @@ echo -e " \033[1m- Calling installation command.\033[0m"
 				--ansi \
 				--password-from-env \
 				--display-name=Alice \
-				alice
+				alice &
 			occ --quiet user:add \
 				--no-interaction \
 				--ansi \
