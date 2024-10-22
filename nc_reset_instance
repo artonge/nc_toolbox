@@ -20,7 +20,6 @@ done
 {
 	workspace="$(realpath "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)/../..")"
 	instancesPath="$workspace/instances"
-	APP_LIST_EXTRA=()
 	initialConfig=''
 
 	function occ {
@@ -81,7 +80,7 @@ done
 
 # Parse options.
 {
-	TEMP=$(getopt --longoptions 's3,checkout:,fetch,database:,ldap,saml,encryption,extra-app:,link-app:,repository:,update-only,offline,test,help' --name argError --options 'bc:fd:lsea:hx:r:uot' -- "$@")
+	TEMP=$(getopt --longoptions 's3,checkout:,fetch,database:,ldap,saml,encryption,extra-app:,repository:,update-only,offline,test,help' --name argError --options 'bc:fd:lseha:r:uot' -- "$@")
 	eval set -- "$TEMP"
 	unset TEMP
 	while true; do
@@ -126,11 +125,6 @@ done
 				shift 2
 				continue
 			;;
-			'-x'|'--link-app')
-				APP_LIST_LOCAL_LINK+=("$2")
-				shift 2
-				continue
-			;;
 			'-u'|'--update-only')
 				updateOnly=true
 				shift
@@ -161,7 +155,6 @@ done
 				help_string+='	-l --ldap | Enable ldap.'$'\n'
 				help_string+='	-e --encryption | Enable encryption.'$'\n'
 				help_string+='	-a --extra-app <app-name> | Enable given application. Can be submitted multiple times.'$'\n'
-				help_string+='	-x --link-app <app-name> | Link a local application into the apps directory of the instance. Can be submitted multiple times.'$'\n'
 				help_string+='	-r --repository <app-name> | Nextcloud repository to clone.'$'\n'
 				help_string+='	-u --update-only | Do not touch user data.'$'\n'
 				help_string+='	-o --offline | Do not make remote git operations.'$'\n'
@@ -539,16 +532,6 @@ echo -e " \033[1m- Setting up apps.\033[0m"
 		fi & # Parallelize setup_app
 	}
 
-	echo -e "	- Removing linked applications."
-	for app in "$instancePath"/apps-extra/*
-	do
-		if [ -L "$app" ]
-		then
-			echo "		- $(basename "$app")"
-			rm -rf "$app"
-		fi
-	done
-
 	echo -e "	- Removing extra applications."
 	for app in "$instancePath"/apps-extra/*
 	do
@@ -568,26 +551,18 @@ echo -e " \033[1m- Setting up apps.\033[0m"
 			continue
 		fi
 
+		if [[ " ${APP_LIST_EXTRA[*]} " == *" $appName "* ]]
+		then
+			continue
+		fi
+
 		echo "		- $appName"
 		rm -rf "$instancePath/apps-extra/$appName"
-	done
-
-
-	echo -e "	- Linking local applications."
-	for app in "${APP_LIST_LOCAL_LINK[@]}"
-	do
-		"$workspace"/engineering/bin/nc_link_app "$instance" "$app"
-		echo "		- $app ($(git --git-dir "$instancePath/apps-extra/$app/.git" rev-parse --abbrev-ref HEAD))"
 	done
 
 	echo -e "	- Setting up default applications."
 	for app in "${APP_LIST_SHIPPED[@]}"
 	do
-		if [[ " ${APP_LIST_LOCAL_LINK[*]} " =~ " $app " ]]
-		then
-			continue
-		fi
-
 		setup_app "$app" "git@github.com:nextcloud/$app.git"
 	done
 
@@ -600,6 +575,12 @@ echo -e " \033[1m- Setting up apps.\033[0m"
 	for app in "${APP_LIST_DEV[@]}"
 	do
 		setup_app "$app" "git@github.com:nextcloud/$app.git" master
+	done
+
+	echo -e "	- Setting up extra applications."
+	for app in "${APP_LIST_EXTRA[@]}"
+	do
+		setup_app "$app" "git@github.com:nextcloud/$app.git"
 	done
 
 	wait
@@ -777,9 +758,9 @@ echo -e " \033[1m- Calling installation command.\033[0m"
 		--database-user="nextcloud" \
 		--database-pass=password
 
-	echo -e " \033[1m- Enabling dev, extra and linked apps.\033[0m"
-	occ app:enable --quiet --force "${APP_LIST_DEV[@]}" "${APP_LIST_EXTRA[@]}" "${APP_LIST_LOCAL_LINK[@]}" || true
-	for app in "${APP_LIST_DEV[@]}" "${APP_LIST_EXTRA[@]}" "${APP_LIST_LOCAL_LINK[@]}"
+	echo -e " \033[1m- Enabling dev, extra apps.\033[0m"
+	occ app:enable --quiet --force "${APP_LIST_DEV[@]}" "${APP_LIST_EXTRA[@]}" || true
+	for app in "${APP_LIST_DEV[@]}" "${APP_LIST_EXTRA[@]}"
 	do
 		echo "	- $app"
 	done
