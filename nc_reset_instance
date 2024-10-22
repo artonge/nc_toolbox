@@ -937,3 +937,4 @@ echo "	https://$instanceDomain"
 
 echo -e " \033[1m- Running cron job\033[0m"
 php ./cron.php &
+occ db:add-missing-indices &
