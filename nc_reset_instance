@@ -510,9 +510,9 @@ echo -e " \033[1m- Setting up apps.\033[0m"
 			fi
 
 			git -C "$workspace/apps/$app" fetch --force --tags --prune --prune-tags --recurse-submodules --quiet
-			git -C "$workspace/apps/$app" worktree add --quiet -f "$instancePath/apps-extra/$app" "$version" ||
-			git -C "$workspace/apps/$app" worktree add --quiet -f "$instancePath/apps-extra/$app" "main" ||
-			git -C "$workspace/apps/$app" worktree add --quiet -f "$instancePath/apps-extra/$app" "master"
+			git -C "$workspace/apps/$app" worktree add --quiet --force "$instancePath/apps-extra/$app" "$version" ||
+			git -C "$workspace/apps/$app" worktree add --quiet --force "$instancePath/apps-extra/$app" "main" ||
+			git -C "$workspace/apps/$app" worktree add --quiet --force "$instancePath/apps-extra/$app" "master"
 		fi
 
 		echo "		- $app ($(parse_git_branch "$instancePath/apps-extra/$app"))"
@@ -522,11 +522,11 @@ echo -e " \033[1m- Setting up apps.\033[0m"
 		then
 			{
 				{
-					git -C "$instancePath/apps-extra/$app" fetch --force --tags --prune --prune-tags --recurse-submodules --quiet
-					git -C "$instancePath/apps-extra/$app" pull --quiet
+					git -C "$instancePath/apps-extra/$app" fetch --force --tags --prune --prune-tags --recurse-submodules --quiet || echo "Failed to fetch $app"
+					git -C "$instancePath/apps-extra/$app" pull --quiet || echo "Failed to pull $app"
 				} &
 				composer --quiet --working-dir "$instancePath/apps-extra/$app" install &
-			} || echo "Failed to update $app"
+			}
 		else
 			composer dumpautoload --quiet --working-dir "$instancePath/apps-extra/$app"
 		fi & # Parallelize setup_app
@@ -598,7 +598,6 @@ cd "$instancePath"
 		exit 0
 	fi
 }
-
 
 echo -e " \033[1m- Recreating ${database:-mysql} database.\033[0m"
 {
@@ -759,7 +758,7 @@ echo -e " \033[1m- Calling installation command.\033[0m"
 		--database-user="nextcloud" \
 		--database-pass=password
 
-	echo -e " \033[1m- Enabling dev, extra apps.\033[0m"
+	echo -e " \033[1m- Enabling dev and extra apps.\033[0m"
 	occ app:enable --quiet --force "${APP_LIST_DEV[@]}" "${APP_LIST_EXTRA[@]}" "${APP_LIST_SHIPPED_ENTERPRISE[@]}" || true
 	for app in "${APP_LIST_DEV[@]}" "${APP_LIST_EXTRA[@]}" "${APP_LIST_SHIPPED_ENTERPRISE[@]}"
 	do
@@ -779,7 +778,7 @@ echo -e " \033[1m- Calling installation command.\033[0m"
 		echo -e " \033[1m- Setting overwrite.cli.url to $instanceDomain.\033[0m"
 		occ --quiet config:system:set overwrite.cli.url --value "https://$instanceDomain"
 
-		echo -e " \033[1m- Setting extra config option to ease development.\033[0m"
+		echo -e " \033[1m- Setting local TLS certificates as trusted.\033[0m"
 		occ --quiet config:system:set allow_local_remote_servers --type boolean --value true
 		occ security:certificates:import "/etc/letsencrypt/live/chain.pem"
 
@@ -796,7 +795,7 @@ echo -e " \033[1m- Calling installation command.\033[0m"
 
 		echo -e " \033[1m- Setting up instance name to '${checkoutTo:-targetVersion}'.\033[0m"
 		occ --quiet config:app:set theming name --value "${checkoutTo:-targetVersion}"
-	} &
+	}
 	{
 		if [ "${enableLdap:-false}" == "true" ]
 		then
@@ -822,7 +821,7 @@ echo -e " \033[1m- Calling installation command.\033[0m"
 			wait
 			occ ldap:test-config s01
 		fi
-	} &
+	}
 	{
 		if [ "${enableSaml:-false}" == "true" ]
 		then
@@ -885,7 +884,7 @@ echo -e " \033[1m- Calling installation command.\033[0m"
 			# occ saml:config:set --security-wantAssertionsEncrypted="1"
 			# occ saml:config:set --security-wantAssertionsSigned="1"
 		fi
-	} &
+	}
 	{
 		if [ "${enableEncryption:-false}" == "true" ]
 		then
@@ -893,7 +892,7 @@ echo -e " \033[1m- Calling installation command.\033[0m"
 			occ --quiet app:enable encryption
 			occ --quiet encryption:enable
 		fi
-	} &
+	}
 	{
 		if [[ "${test:-false}" == "false" ]]
 		then
@@ -925,7 +924,7 @@ echo -e " \033[1m- Calling installation command.\033[0m"
 				charlie &
 				wait
 		fi
-	} &
+	}
 	wait
 }
 
@@ -937,4 +936,4 @@ echo "	https://$instanceDomain"
 
 echo -e " \033[1m- Running cron job\033[0m"
 php ./cron.php &
-occ db:add-missing-indices &
+occ --quiet db:add-missing-indices &
