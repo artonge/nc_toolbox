@@ -54,9 +54,11 @@ fi
 
 if [ ! -d "$workspace/instances/$instance/apps-extra/$app" ]
 then
+	mainBranch="$(git -C "$workspace/apps/$app" rev-parse --verify --quiet --abbrev-ref origin/HEAD --)"
+	mainBranch="${mainBranch#origin/}"
+
 	git -C "$workspace/apps/$app" worktree add --quiet --force "$workspace/instances/$instance/apps-extra/$app" "$instance" ||
-	git -C "$workspace/apps/$app" worktree add --quiet --force "$workspace/instances/$instance/apps-extra/$app" "main" ||
-	git -C "$workspace/apps/$app" worktree add --quiet --force "$workspace/instances/$instance/apps-extra/$app" "master"
+	git -C "$workspace/apps/$app" worktree add --quiet --force "$workspace/instances/$instance/apps-extra/$app" "$mainBranch"
 fi
 
 git -C "$workspace/instances/$instance/apps-extra/$app" fetch --force --tags --prune --prune-tags --recurse-submodules --quiet || echo "Failed to fetch $app"

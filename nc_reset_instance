@@ -509,10 +509,12 @@ echo -e " \033[1m- Setting up apps.\033[0m"
 				git clone --quiet "$clone_url" "$workspace/apps/$app" > /dev/null
 			fi
 
+			mainBranch="$(git -C "$workspace/apps/$app" rev-parse --verify --quiet --abbrev-ref origin/HEAD --)"
+			mainBranch="${mainBranch#origin/}"
+
 			git -C "$workspace/apps/$app" fetch --force --tags --prune --prune-tags --recurse-submodules --quiet
 			git -C "$workspace/apps/$app" worktree add --quiet --force "$instancePath/apps-extra/$app" "$version" ||
-			git -C "$workspace/apps/$app" worktree add --quiet --force "$instancePath/apps-extra/$app" "main" ||
-			git -C "$workspace/apps/$app" worktree add --quiet --force "$instancePath/apps-extra/$app" "master"
+			git -C "$workspace/apps/$app" worktree add --quiet --force "$instancePath/apps-extra/$app" "$mainBranch"
 		fi
 
 		echo "		- $app ($(parse_git_branch "$instancePath/apps-extra/$app"))"
