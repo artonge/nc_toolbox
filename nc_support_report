@@ -1,28 +1,52 @@
 #!/bin/bash
 
+set -e
+
 token="" # get it from zammad, with permission: ticket.agent
 user="" # url encode, e.g. escape whitespace with %20, encode umlaute
 userID=
 
 if [ $# -eq 0 ]
 then
-    monday=$(date -dlast-monday +%F)
+    monday=$(date -d "last monday" +%F)
 else
     # Format: 2022-08-29
     monday=$1
 fi
 
-yesterday=$(date -d-yesterday +%F)
+sunday=$(date -d "$monday + 6 days" +%F)
 
-echo "Range: $monday - $yesterday"
+echo "Range: $monday - $sunday"
 echo
-tickets=$(curl 2>/dev/null --request GET --url "https://support.nextcloud.com/api/v1/tickets/search?query=article.from%3A%22$user%22%20and%20article.created_at%3A%5B$monday%20TO%20$yesterday%5D" --header "authorization: Token token=$token")
-for ticket in $(echo $tickets | jq '.assets.Ticket | .[] | .id'); do
-    title=$(curl --silent --request GET --header "authorization: Token token=$token" --url "https://support.nextcloud.com/api/v1/tickets/$ticket" | jq --raw-output '.title')
-    articles=$(curl --silent --request GET --url "https://support.nextcloud.com/api/v1/ticket_articles/by_ticket/$ticket"  --header "authorization: Token token=$token")
+response=$(
+    curl 2>/dev/null \
+        --request GET \
+        --url "https://support.nextcloud.com/api/v1/tickets/search?query=article.from%3A%22$user%22%20and%20article.created_at%3A%5B$monday%20TO%20$sunday%5D" \
+        --header "authorization: Token token=$token"
+)
+tickets=$(echo "$response" | jq '.tickets')
+
+for ticketId in $(echo "$tickets" | jq '.[]')
+do
+    articles=$(
+        curl \
+            --silent \
+            --request GET \
+            --url "https://support.nextcloud.com/api/v1/ticket_articles/by_ticket/$ticketId" \
+            --header "authorization: Token token=$token"
+        )
+
+    ownerId=$(echo "$response" | jq --raw-output ".assets.Ticket[\"$ticketId\"].owner_id")
+    owner=$(echo "$response" | jq --raw-output ".assets.User[\"$ownerId\"].firstname")
 
     if [ "$( echo "$articles" | jq ".[] | select((.created_by_id == $userID) and (.updated_at >= \"$monday\"))" | wc -l )" -gt 0 ]
     then
-        echo "  - $title [#$ticket](https://support.nextcloud.com/#ticket/zoom/$ticket)"
+        if [ $ownerId == $userID ]
+        then
+            echo " - Follow-up on ticket [#$ticketId](https://support.nextcloud.com/#ticket/zoom/$ticketId)"
+        else
+            echo " - Helped $owner with ticket [#$ticketId](https://support.nextcloud.com/#ticket/zoom/$ticketId)"
+        fi
+
     fi
 done
