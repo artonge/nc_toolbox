@@ -524,8 +524,13 @@ echo -e " \033[1m- Setting up apps.\033[0m"
 		then
 			{
 				{
-					git -C "$instancePath/apps-extra/$app" fetch --force --tags --prune --prune-tags --recurse-submodules --quiet || echo "Failed to fetch $app"
-					git -C "$instancePath/apps-extra/$app" pull --quiet || echo "Failed to pull $app"
+					if [ "$(parse_git_dirty "$instancePath/apps-extra/$app")" == "" ]
+					then
+						git -C "$instancePath/apps-extra/$app" fetch --force --tags --prune --prune-tags --recurse-submodules --quiet || echo "Failed to fetch $app"
+						git -C "$instancePath/apps-extra/$app" pull --quiet 2> /dev/null || (echo "Failed to pull $app"; git -C "$instancePath/apps-extra/$app" status)
+					else
+						git -C "$instancePath/apps-extra/$app" status
+					fi
 				} &
 				composer --quiet --working-dir "$instancePath/apps-extra/$app" install &
 			}
