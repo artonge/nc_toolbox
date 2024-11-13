@@ -1,0 +1,17 @@
+#!/bin/bash
+
+set -eu
+
+workspace="$(realpath "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)/../..")"
+
+for config in /etc/nginx/conf.d/nextcloud-*.conf
+do
+	configName=$(basename "$config")
+	instance=${configName#nextcloud-}
+	export instance=${instance%.test.conf}
+	echo $instance
+
+	envsubst "\$instance" < $workspace/engineering/nextcloud.test.conf.template | sudo tee "$config" 1> /dev/null
+done
+
+sudo systemctl restart nginx
