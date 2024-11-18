@@ -2,9 +2,9 @@
 
 set -e
 
-token="" # get it from zammad, with permission: ticket.agent
-user="" # url encode, e.g. escape whitespace with %20, encode umlaute
-userID=
+token="$ZAMMAD_TOKEN" # get it from Zammad, with permission: ticket.agent
+user="$ZAMMAD_USER" # url encode, e.g. escape whitespace with %20, encode umlaut
+userID="$ZAMMAD_USER_ID"
 
 if [ $# -eq 0 ]
 then
@@ -41,12 +41,11 @@ do
 
     if [ "$( echo "$articles" | jq ".[] | select((.created_by_id == $userID) and (.updated_at >= \"$monday\"))" | wc -l )" -gt 0 ]
     then
-        if [ $ownerId == $userID ]
+        if [ "$ownerId" == "$userID" ]
         then
             echo " - Follow-up on ticket [#$ticketId](https://support.nextcloud.com/#ticket/zoom/$ticketId)"
         else
             echo " - Helped $owner with ticket [#$ticketId](https://support.nextcloud.com/#ticket/zoom/$ticketId)"
         fi
-
     fi
 done
