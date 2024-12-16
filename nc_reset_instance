@@ -700,25 +700,32 @@ echo -e " \033[1m- Recreating ${database:-mysql} database.\033[0m"
 		fi
 
 		start_service docker
-		docker kill "minio_$instance" || true
-		docker rm "minio_$instance" || true
 		docker pull --quiet bitnami/minio
 
-			# --volume "$certPath":/certs \
-		docker run \
-			--detach \
-			--name "minio_$instance" \
-			-p "9100":"9000" \
-			-p "9101":"9001" \
-			--hostname minio.test \
-			--env MINIO_ROOT_USER="nextcloud" \
-			--env MINIO_ROOT_PASSWORD="nextcloud" \
-			--env MINIO_BROWSER_REDIRECT_URL="http://minio.test:9101" \
-			--env MINIO_SCHEME="http" \
-			--env MINIO_HTTP_TRACE="/dev/stdout" \
-			--env BITNAMI_DEBUG="yes" \
-			bitnami/minio
-
+		if docker ps -a | grep minio 1> /dev/null
+		then
+			if docker ps -a | grep minio | grep Created 1> /dev/null
+			then
+				docker start minio
+			else
+				echo Minio already started
+			fi
+		else
+			docker run \
+				--detach \
+				--name "minio" \
+				-p "9100":"9000" \
+				-p "9101":"9001" \
+				--hostname minio.test \
+				--env MINIO_ROOT_USER="nextcloud" \
+				--env MINIO_ROOT_PASSWORD="nextcloud" \
+				--env MINIO_BROWSER_REDIRECT_URL="http://minio.test:9101" \
+				--env MINIO_SCHEME="http" \
+				--env MINIO_HTTP_TRACE="/dev/stdout" \
+				--env BITNAMI_DEBUG="yes" \
+				bitnami/minio
+				# --volume "$certPath":/certs \
+		fi
 		echo -e " \033[1m- Minio is available at: http://minio.test:9101.\033[0m"
 
 		# if [ "${enableEncryption:-false}" == "true" ]
