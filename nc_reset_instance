@@ -704,7 +704,7 @@ echo -e " \033[1m- Recreating ${database:-mysql} database.\033[0m"
 
 		if docker ps -a | grep minio 1> /dev/null
 		then
-			if docker ps -a | grep minio | grep Created 1> /dev/null
+			if docker ps -a | grep minio | grep -E '(Exited|Created)' 1> /dev/null
 			then
 				docker start minio
 			else
