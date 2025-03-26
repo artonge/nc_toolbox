@@ -425,7 +425,6 @@ echo -e " \033[1m- Setting up files for instance $instance on $targetVersion.\03
 	fi
 }
 
-
 echo -e " \033[1m- Setting up apps.\033[0m"
 {
 	initialConfig="$initialConfig\
@@ -493,16 +492,15 @@ echo -e " \033[1m- Setting up apps.\033[0m"
 		app="$1"
 		clone_url="$2"
 		version="${3:-$targetVersion}"
+		appPath="$instancePath/apps-extra/$app"
 
 		if [[ "${test:-false}" == "true" ]]
 		then
-			echo "		- Skipping setup $app"
+			echo "	- Skipping setup $app"
 			return
 		fi
 
-		printf "		- %s ...\r" "$app"
-
-		if [ ! -e "$instancePath/apps-extra/$app" ]
+		if [ ! -e "$appPath" ]
 		then
 			if [ ! -e "$workspace/apps/$app" ]
 			then
@@ -513,79 +511,98 @@ echo -e " \033[1m- Setting up apps.\033[0m"
 			mainBranch="${mainBranch#origin/}"
 
 			git -C "$workspace/apps/$app" fetch --force --tags --prune --prune-tags --recurse-submodules --quiet
-			git -C "$workspace/apps/$app" worktree add --quiet --force "$instancePath/apps-extra/$app" "$version" ||
-			git -C "$workspace/apps/$app" worktree add --quiet --force "$instancePath/apps-extra/$app" "$mainBranch"
+
+			git -C "$workspace/apps/$app" worktree add --quiet --force "$appPath" "$version" ||
+			git -C "$workspace/apps/$app" worktree add --quiet --force "$appPath" "$mainBranch" ||
+			git -C "$workspace/apps/$app" worktree add --quiet --force "$appPath" "master"
 		fi
 
-		echo "		- $app ($(parse_git_branch "$instancePath/apps-extra/$app"))"
+		if [ ! -e "$appPath/.git" ]
+		then
+			echo -e "\033[1;31mWARNING - this is not a proper git repository !!! $appPath\033[0m"
+			return
+		fi
 
 		# Asynchronously pull new changes for the app.
 		if [ "${offline:-false}" == "false" ]
 		then
-			{
-				{
-					if [ "$(parse_git_dirty "$instancePath/apps-extra/$app")" == "" ]
-					then
-						git -C "$instancePath/apps-extra/$app" fetch --force --tags --prune --prune-tags --recurse-submodules --quiet || echo "Failed to fetch $app"
-						git -C "$instancePath/apps-extra/$app" pull --quiet 2> /dev/null || (echo "Failed to pull $app"; git -C "$instancePath/apps-extra/$app" status)
-					else
-						git -C "$instancePath/apps-extra/$app" status
-					fi
-				} &
-				composer --quiet --working-dir "$instancePath/apps-extra/$app" install &
-			}
+			if [ "$(parse_git_dirty "$appPath")" != "" ]
+			then
+				git -C "$appPath" status --short
+				echo -e "\033[1;32mDo you want to clean the $app repository ? [y/n]\033[0m"
+				read -rp "" clean
+
+				if [ "${clean}" == "y" ]
+				then
+					git -C "$appPath" add .
+					git -C "$appPath" reset --hard
+				fi
+			fi
+
+			if [ "$(parse_git_dirty "$appPath")" == "" ]
+			then
+				if [ "${fetchRepo:-false}" == "true" ]
+				then
+					git -C "$appPath" fetch --force --tags --prune --prune-tags --recurse-submodules --quiet || echo -e "\033[1;31mFailed to fetch $app\033[0m"
+				fi
+
+				mainRemoteAndBranch="$(git -C "$appPath" rev-parse --verify --quiet --abbrev-ref origin/HEAD --)"
+				mainBranch="${mainRemoteAndBranch#origin/}"
+
+				currentBranch=$(git -C "$appPath" rev-parse --abbrev-ref HEAD)
+				if [ "$version" == 'master' ]
+				then
+					checkoutVersion="$mainBranch"
+				else
+					checkoutVersion="$version"
+				fi
+
+				if [ "$currentBranch" != "$checkoutVersion" ]
+				then
+					git -C "$appPath" checkout --quiet --force "$checkoutVersion" || echo -e "\033[1;31mFailed to checkout $checkoutVersion for $app\033[0m"
+				fi
+
+				currentBranch=$(git -C "$appPath" rev-parse --abbrev-ref HEAD)
+				if [ "$currentBranch" != "$checkoutVersion" ] && [ "$currentBranch" != "$mainBranch" ] && [ "$mainBranch" != "$checkoutVersion" ]
+				then
+					git -C "$appPath" checkout --quiet --force "$mainBranch" || echo -e "\033[1;31mFailed to checkout $mainBranch for $app\033[0m"
+				fi
+
+				currentBranch=$(git -C "$appPath" rev-parse --abbrev-ref HEAD)
+				if [ "$currentBranch" != "$checkoutVersion" ] && [ "$currentBranch" != "$mainBranch" ] && [ "$currentBranch" != "master" ] && [ "master" != "$mainBranch" ] && [ "master" != "$checkoutVersion" ]
+				then
+					git -C "$appPath" checkout --quiet --force "master" || echo -e "\033[1;31mFailed to checkout 'master for $app\033[0m"
+				fi
+
+				if [ "${fetchRepo:-false}" == "true" ]
+				then
+					git -C "$appPath" pull --quiet 2> /dev/null || (echo -e "\033[1;31mFailed to pull $app\033[0m"; git -C "$appPath" status)
+				fi
+			fi
+
+			echo "	- $app ($(parse_git_branch "$appPath"))"
+			composer --quiet --working-dir "$appPath" install
 		else
-			composer dumpautoload --quiet --working-dir "$instancePath/apps-extra/$app"
-		fi & # Parallelize setup_app
+			echo "	- $app ($(parse_git_branch "$appPath"))"
+			composer dumpautoload --quiet --working-dir "$appPath"
+		fi
 	}
 
-	echo -e "	- Removing extra applications."
-	for app in "$instancePath"/apps-extra/*
-	do
-		appName=$(basename "$app")
-		if [[ " ${APP_LIST_SHIPPED[*]} " == *" $appName "* ]]
-		then
-			continue
-		fi
-
-		if [[ " ${APP_LIST_SHIPPED_ENTERPRISE[*]} " == *" $appName "* ]]
-		then
-			continue
-		fi
-
-		if [[ " ${APP_LIST_DEV[*]} " == *" $appName "* ]]
-		then
-			continue
-		fi
-
-		if [[ " ${APP_LIST_EXTRA[*]} " == *" $appName "* ]]
-		then
-			continue
-		fi
-
-		echo "		- $appName"
-		rm -rf "$instancePath/apps-extra/$appName"
-	done
-
-	echo -e "	- Setting up default applications."
 	for app in "${APP_LIST_SHIPPED[@]}"
 	do
 		setup_app "$app" "git@github.com:nextcloud/$app.git"
 	done
 
-	echo -e "	- Setting up default enterprise applications."
 	for app in "${APP_LIST_SHIPPED_ENTERPRISE[@]}"
 	do
 		setup_app "$app" "git@github.com:nextcloud-gmbh/$app.git"
 	done
 
-	echo -e "	- Setting up dev applications."
 	for app in "${APP_LIST_DEV[@]}"
 	do
 		setup_app "$app" "git@github.com:nextcloud/$app.git" master
 	done
 
-	echo -e "	- Setting up extra applications."
 	for app in "${APP_LIST_EXTRA[@]}"
 	do
 		setup_app "$app" "git@github.com:nextcloud/$app.git"
