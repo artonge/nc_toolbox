@@ -58,7 +58,8 @@ then
 	mainBranch="${mainBranch#origin/}"
 
 	git -C "$workspace/apps/$app" worktree add --quiet --force "$workspace/instances/$instance/apps-extra/$app" "$instance" ||
-	git -C "$workspace/apps/$app" worktree add --quiet --force "$workspace/instances/$instance/apps-extra/$app" "$mainBranch"
+	git -C "$workspace/apps/$app" worktree add --quiet --force "$workspace/instances/$instance/apps-extra/$app" "$mainBranch" ||
+	git -C "$workspace/apps/$app" worktree add --quiet --force "$workspace/instances/$instance/apps-extra/$app" "master"
 fi
 
 git -C "$workspace/instances/$instance/apps-extra/$app" fetch --force --tags --prune --prune-tags --recurse-submodules --quiet || echo "Failed to fetch $app"
