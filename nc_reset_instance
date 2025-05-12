@@ -717,7 +717,11 @@ echo -e " \033[1m- Recreating ${database:-mysql} database.\033[0m"
 		fi
 
 		start_service docker
-		docker pull --quiet bitnami/minio
+
+		if [ "${offline:-false}" == "false" ]
+		then
+			docker pull --quiet bitnami/minio
+		fi
 
 		if docker ps -a | grep minio 1> /dev/null
 		then
