@@ -716,7 +716,7 @@ echo -e " \033[1m- Recreating ${database:-mysql} database.\033[0m"
 			echo "127.0.0.1	minio.test" | sudo tee --append /etc/hosts 1> /dev/null
 		fi
 
-		start_service docker
+		start_service podman
 
 		if [ "${offline:-false}" == "false" ]
 		then
