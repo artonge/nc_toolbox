@@ -55,7 +55,7 @@ done
 	fi
 
 	instancePath="$instancesPath/$instance"
-	instanceID="nextcloud_$instance"
+	instanceID="nextcloud_${instance/-/_}"
 	instanceDomain="nextcloud-$instance.test"
 
 	if [ "$targetVersion" == "" ]
