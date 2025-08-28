@@ -17,17 +17,20 @@ fi
 sunday=$(date -d "$monday + 6 days" +%F)
 
 echo "Range: $monday - $sunday"
-echo
-response=$(
+
+articles=$(
     curl 2>/dev/null \
         --request GET \
         --url "https://support.nextcloud.com/api/v1/tickets/search?query=article.from%3A%22$user%22%20and%20article.created_at%3A%5B$monday%20TO%20$sunday%5D" \
         --header "authorization: Token token=$token"
 )
-tickets=$(echo "$response" | jq '.tickets')
 
-for ticketId in $(echo "$tickets" | jq '.[]')
+# for ticketId in $(echo "$articles" | jq -cr '.[]')
+for ticketBase64 in $(echo "${articles}" | jq -r '.[] | @base64')
 do
+    ticket=$(echo $ticketBase64 | base64 --decode)
+    ticketId=$(echo $ticket | jq -r '.id')
+
     articles=$(
         curl \
             --silent \
@@ -36,8 +39,7 @@ do
             --header "authorization: Token token=$token"
         )
 
-    ownerId=$(echo "$response" | jq --raw-output ".assets.Ticket[\"$ticketId\"].owner_id")
-    owner=$(echo "$response" | jq --raw-output ".assets.User[\"$ownerId\"].firstname")
+    ownerId=$(echo $ticket | jq -r '.owner_id')
 
     if [ "$( echo "$articles" | jq ".[] | select((.created_by_id == $userID) and (.updated_at >= \"$monday\"))" | wc -l )" -gt 0 ]
     then
@@ -45,7 +47,17 @@ do
         then
             echo " - Follow-up on ticket [#$ticketId](https://support.nextcloud.com/#ticket/zoom/$ticketId)"
         else
-            echo " - Helped $owner with ticket [#$ticketId](https://support.nextcloud.com/#ticket/zoom/$ticketId)"
+            owner=$(
+                curl \
+                    --silent \
+                    --request GET \
+                    --url "https://support.nextcloud.com/api/v1/users/$ownerId" \
+                    --header "authorization: Token token=$token"
+                )
+
+            ownerFirstName=$(echo $owner | jq -r '.firstname')
+
+            echo " - Helped $ownerFirstName with ticket [#$ticketId](https://support.nextcloud.com/#ticket/zoom/$ticketId)"
         fi
     fi
 done
