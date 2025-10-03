@@ -15,7 +15,7 @@ fi
 echo "Switching from $current_version to $target_version"
 
 # https://computingforgeeks.com/how-to-install-php-on-fedora/
-sudo dnf module -y --quiet remove "php:remi-$current_version"
+# sudo dnf module -y --quiet remove "php:remi-$current_version"
 sudo dnf module -y --quiet reset "php:remi-$current_version"
 sudo dnf module -y --quiet install "php:remi-$target_version"
 sudo dnf reinstall -y --quiet blackfire-php

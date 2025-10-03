@@ -17,7 +17,7 @@ cd $folder
 pwd
 
 # Make sure that we are in the right folder
-git remote show origin|grep git@github.com:nextcloud/server.git
+git remote show origin | grep git@github.com:nextcloud/server.git
 
 # Update to latest commit
 git checkout $branch
