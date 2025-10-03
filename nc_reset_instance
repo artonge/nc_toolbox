@@ -181,6 +181,7 @@ done
 	APP_LIST_SHIPPED=()
 	APP_LIST_SHIPPED+=(dashboard)
 	APP_LIST_SHIPPED+=(activity)
+	APP_LIST_SHIPPED+=(circles)
 	APP_LIST_SHIPPED+=(files_pdfviewer)
 	# APP_LIST_SHIPPED+=(files_rightclick) NOT NEEDED ANYMORE
 	# APP_LIST_SHIPPED+=(files_videoplayer) DEPRECATED
@@ -212,7 +213,6 @@ done
 	# Files subscription
 	APP_LIST_SUPPORTED+=(globalsiteselector)
 	APP_LIST_SUPPORTED+=(bruteforcesettings)
-	APP_LIST_SUPPORTED+=(circles)
 	APP_LIST_SUPPORTED+=(data_request)
 	APP_LIST_SUPPORTED+=(external)
 	APP_LIST_SUPPORTED+=(files_accesscontrol)
@@ -411,6 +411,10 @@ echo -e " \033[1m- Setting up files for instance $instance on $targetVersion.\03
 	fi
 
 	mkdir --parent "$instancePath/apps-extra"
+	mkdir --parent "$instancePath/apps-enterprise"
+	mkdir --parent "$instancePath/apps-appstore"
+	mkdir --parent "$instancePath/apps-dev"
+	mkdir --parent "$instancePath/apps-shipped"
 
 	# Asynchronously pull new changes for server.
 	if [ "${offline:-false}" == "false" ]
@@ -436,8 +440,28 @@ echo -e " \033[1m- Setting up apps.\033[0m"
 					'writable' => false,\
 			],\
 			[\
+					'path'=> '$instancePath/apps-shipped',\
+					'url' => '/apps-shipped',\
+					'writable' => false,\
+			],
+			[\
+					'path'=> '$instancePath/apps-enterprise',\
+					'url' => '/apps-enterprise',\
+					'writable' => false,\
+			],
+			[\
+					'path'=> '$instancePath/apps-dev',\
+					'url' => '/apps-dev',\
+					'writable' => false,\
+			],
+			[\
 					'path'=> '$instancePath/apps-extra',\
 					'url' => '/apps-extra',\
+					'writable' => false,\
+			],
+			[\
+					'path'=> '$instancePath/apps-appstore',\
+					'url' => '/apps-appstore',\
 					'writable' => true,\
 			],
 		],"
@@ -490,10 +514,11 @@ echo -e " \033[1m- Setting up apps.\033[0m"
 	}
 
 	function setup_app() {
-		app="$1"
-		clone_url="$2"
-		version="${3:-$targetVersion}"
-		appPath="$instancePath/apps-extra/$app"
+		appsDirectoryName="$1"
+		app="$2"
+		clone_url="$3"
+		version="${4:-$targetVersion}"
+		appPath="$instancePath/$appsDirectoryName/$app"
 
 		if [[ "${test:-false}" == "true" ]]
 		then
@@ -580,9 +605,8 @@ echo -e " \033[1m- Setting up apps.\033[0m"
 					git -C "$appPath" pull --quiet 2> /dev/null || (echo -e "\033[1;31mFailed to pull $app\033[0m"; git -C "$appPath" status)
 				fi
 			fi
-
 			echo "	- $app ($(parse_git_branch "$appPath"))"
-			composer --quiet --working-dir "$appPath" install
+			composer --quiet --working-dir "$appPath" install || true
 		else
 			echo "	- $app ($(parse_git_branch "$appPath"))"
 			composer dumpautoload --quiet --working-dir "$appPath"
@@ -591,22 +615,22 @@ echo -e " \033[1m- Setting up apps.\033[0m"
 
 	for app in "${APP_LIST_SHIPPED[@]}"
 	do
-		setup_app "$app" "git@github.com:nextcloud/$app.git"
+		setup_app "apps-shipped" "$app" "git@github.com:nextcloud/$app.git"
 	done
 
 	for app in "${APP_LIST_SHIPPED_ENTERPRISE[@]}"
 	do
-		setup_app "$app" "git@github.com:nextcloud-gmbh/$app.git"
+		setup_app "apps-enterprise" "$app" "git@github.com:nextcloud-gmbh/$app.git"
 	done
 
 	for app in "${APP_LIST_DEV[@]}"
 	do
-		setup_app "$app" "git@github.com:nextcloud/$app.git" master
+		setup_app "apps-dev" "$app" "git@github.com:nextcloud/$app.git" master
 	done
 
 	for app in "${APP_LIST_EXTRA[@]}"
 	do
-		setup_app "$app" "git@github.com:nextcloud/$app.git"
+		setup_app "apps-extra" "$app" "git@github.com:nextcloud/$app.git"
 	done
 
 	wait
@@ -843,7 +867,7 @@ echo -e " \033[1m- Calling installation command.\033[0m"
 			occ --quiet ldap:set-config s01 ldapPort 389 &
 			occ --quiet ldap:set-config s01 ldapAgentName "cn=admin,dc=example,dc=com" &
 			occ --quiet ldap:set-config s01 ldapAgentPassword "password" &
-			occ --quiet ldap:set-config s01 ldapBase "ou=users,dc=example,dc=com" &
+			occ --quiet ldap:set-config s01 ldapBase "dc=example,dc=com" &
 			occ --quiet ldap:set-config s01 ldapBaseUsers "ou=users,dc=example,dc=com" &
 			occ --quiet ldap:set-config s01 ldapBaseGroups "ou=groups,dc=example,dc=com" &
 			occ --quiet ldap:set-config s01 ldapUserFilterObjectclass "inetOrgPerson" &
@@ -958,7 +982,7 @@ echo -e " \033[1m- Calling installation command.\033[0m"
 				--password-from-env \
 				--display-name=Charlie \
 				charlie &
-				wait
+			wait
 		fi
 	}
 	wait
