@@ -179,7 +179,6 @@ done
 # App lists.
 {
 	APP_LIST_SHIPPED=()
-	APP_LIST_SHIPPED+=(dashboard)
 	APP_LIST_SHIPPED+=(activity)
 	APP_LIST_SHIPPED+=(circles)
 	APP_LIST_SHIPPED+=(files_pdfviewer)
