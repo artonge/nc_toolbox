@@ -385,7 +385,7 @@ echo -e " \033[1m- Setting up files for instance $instance on $targetVersion.\03
 {
 	if [ ! -e "$instancePath" ]
 	then
-		git -C "$instancesPath/server1" worktree add "$instancePath" "$targetVersion"
+		git -C "$instancesPath/master" worktree add "$instancePath" "$targetVersion"
 	fi
 
 	if [ "${updateOnly:-false}" = "false" ]
@@ -527,21 +527,21 @@ echo -e " \033[1m- Setting up apps.\033[0m"
 			return
 		fi
 
+		if [ ! -e "$workspace/instances/master/$appsDirectoryName/$app" ]
+		then
+			git clone --quiet "$clone_url" "$workspace/instances/master/$appsDirectoryName/$app" > /dev/null
+		fi
+
 		if [ ! -e "$appPath" ]
 		then
-			if [ ! -e "$workspace/apps/$app" ]
-			then
-				git clone --quiet "$clone_url" "$workspace/apps/$app" > /dev/null
-			fi
-
-			mainBranch="$(git -C "$workspace/apps/$app" rev-parse --verify --quiet --abbrev-ref origin/HEAD --)"
+			mainBranch="$(git -C "$workspace/instances/master/$appsDirectoryName/$app" rev-parse --verify --quiet --abbrev-ref origin/HEAD --)"
 			mainBranch="${mainBranch#origin/}"
 
-			git -C "$workspace/apps/$app" fetch --force --tags --prune --prune-tags --recurse-submodules --quiet
+			git -C "$workspace/instances/master/$appsDirectoryName/$app" fetch --force --tags --prune --prune-tags --recurse-submodules --quiet
 
-			git -C "$workspace/apps/$app" worktree add --quiet --force "$appPath" "$version" ||
-			git -C "$workspace/apps/$app" worktree add --quiet --force "$appPath" "$mainBranch" ||
-			git -C "$workspace/apps/$app" worktree add --quiet --force "$appPath" "master"
+			git -C "$workspace/instances/master/$appsDirectoryName/$app" worktree add --quiet --force "$appPath" "$version" ||
+			git -C "$workspace/instances/master/$appsDirectoryName/$app" worktree add --quiet --force "$appPath" "$mainBranch" ||
+			git -C "$workspace/instances/master/$appsDirectoryName/$app" worktree add --quiet --force "$appPath" "master"
 		fi
 
 		if [ ! -e "$appPath/.git" ]
