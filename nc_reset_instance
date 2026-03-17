@@ -854,6 +854,9 @@ echo -e " \033[1m- Calling installation command.\033[0m"
 
 		echo -e " \033[1m- Setting up instance name to '$targetVersion'.\033[0m"
 		occ --quiet config:app:set theming name --value "$targetVersion"
+
+		echo -e " \033[1m- Setting phone prefix to FR.\033[0m"
+		occ --quiet config:system:set default_phone_region --value FR
 	}
 	{
 		if [ "${enableLdap:-false}" == "true" ]
