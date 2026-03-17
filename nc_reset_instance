@@ -405,10 +405,10 @@ echo -e " \033[1m- Setting up files for instance $instance on $targetVersion.\03
 	if [ "${checkoutTo:-}" != "" ]
 	then
 		echo -e "	- Checking out $checkoutTo."
-		git -C "$instancePath" checkout --quiet --recurse-submodules "$checkoutTo"
+		git -C "$instancePath" checkout --quiet --ignore-other-worktrees --recurse-submodules "$checkoutTo"
 	else
 		echo -e "	- Checking out $targetVersion."
-		git -C "$instancePath" checkout --quiet --recurse-submodules "$targetVersion"
+		git -C "$instancePath" checkout --quiet --ignore-other-worktrees --recurse-submodules "$targetVersion"
 	fi
 
 	mkdir --parent "$instancePath/apps-extra"
@@ -586,19 +586,19 @@ echo -e " \033[1m- Setting up apps.\033[0m"
 
 				if [ "$currentBranch" != "$checkoutVersion" ]
 				then
-					git -C "$appPath" checkout --quiet --force "$checkoutVersion" || echo -e "\033[1;31mFailed to checkout $checkoutVersion for $app\033[0m"
+					git -C "$appPath" checkout --quiet --ignore-other-worktrees --force "$checkoutVersion" || echo -e "\033[1;31mFailed to checkout $checkoutVersion for $app\033[0m"
 				fi
 
 				currentBranch=$(git -C "$appPath" rev-parse --abbrev-ref HEAD)
 				if [ "$currentBranch" != "$checkoutVersion" ] && [ "$currentBranch" != "$mainBranch" ] && [ "$mainBranch" != "$checkoutVersion" ]
 				then
-					git -C "$appPath" checkout --quiet --force "$mainBranch" || echo -e "\033[1;31mFailed to checkout $mainBranch for $app\033[0m"
+					git -C "$appPath" checkout --quiet --ignore-other-worktrees --force "$mainBranch" || echo -e "\033[1;31mFailed to checkout $mainBranch for $app\033[0m"
 				fi
 
 				currentBranch=$(git -C "$appPath" rev-parse --abbrev-ref HEAD)
 				if [ "$currentBranch" != "$checkoutVersion" ] && [ "$currentBranch" != "$mainBranch" ] && [ "$currentBranch" != "master" ] && [ "master" != "$mainBranch" ] && [ "master" != "$checkoutVersion" ]
 				then
-					git -C "$appPath" checkout --quiet --force "master" || echo -e "\033[1;31mFailed to checkout 'master for $app\033[0m"
+					git -C "$appPath" checkout --quiet --ignore-other-worktrees --force "master" || echo -e "\033[1;31mFailed to checkout 'master for $app\033[0m"
 				fi
 
 				if [ "${fetchRepo:-false}" == "true" ]
