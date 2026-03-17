@@ -746,19 +746,19 @@ echo -e " \033[1m- Recreating ${database:-mysql} database.\033[0m"
 
 		if [ "${offline:-false}" == "false" ]
 		then
-			docker pull --quiet bitnami/minio
+			podman pull --quiet minio/minio
 		fi
 
-		if docker ps -a | grep minio 1> /dev/null
+		if podman ps -a | grep minio 1> /dev/null
 		then
-			if docker ps -a | grep minio | grep -E '(Exited|Created)' 1> /dev/null
+			if podman ps -a | grep minio | grep -E '(Exited|Created)' 1> /dev/null
 			then
-				docker start minio
+				podman start minio
 			else
 				echo Minio already started
 			fi
 		else
-			docker run \
+			podman run \
 				--detach \
 				--name "minio" \
 				-p "9100":"9000" \
@@ -767,10 +767,8 @@ echo -e " \033[1m- Recreating ${database:-mysql} database.\033[0m"
 				--env MINIO_ROOT_USER="nextcloud" \
 				--env MINIO_ROOT_PASSWORD="nextcloud" \
 				--env MINIO_BROWSER_REDIRECT_URL="http://minio.test:9101" \
-				--env MINIO_SCHEME="http" \
-				--env MINIO_HTTP_TRACE="/dev/stdout" \
-				--env BITNAMI_DEBUG="yes" \
-				bitnami/minio
+				minio/minio server /data \
+				--console-address ":9001"
 				# --volume "$certPath":/certs \
 		fi
 		echo -e " \033[1m- Minio is available at: http://minio.test:9101.\033[0m"
