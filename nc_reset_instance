@@ -275,6 +275,8 @@ done
 	livePath="/etc/letsencrypt/live"
 	certPath="$livePath/$instanceDomain"
 
+	sudo mkdir -p "$livePath"
+
 	# Prevent overriding existing root CA.
 	if [ ! -f "$livePath/chain.pem" ]
 	then
