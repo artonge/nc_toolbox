@@ -9,57 +9,31 @@ workspace="$(realpath "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null 
 
 if [ "$instance" == "" ]
 then
-	mapfile -t instances < <(find "$workspace" -maxdepth 4 -name config.php)
-
-	if [ "${#instances[@]}" == "0" ]
-	then
-		echo "No instance found, exiting."
-		exit 0
-	fi
-
-	echo -e " \033[1m- Found ${#instances[@]} instances, which one do you want to link into ?\033[0m "
-
-	for i in "${!instances[@]}"
-	do
-		instance_name=$(basename "$(dirname "$(dirname "${instances[$i]}")")")
-		echo "	- $instance_name"
-	done
-
-	read -rp "> " instance
+	echo -e " \033[1m- Please specify an instance id\033[0m"
+	exit 1
 fi
 
 if [ "$app" == "" ]
 then
-	echo -e " \033[1m- Which app do you want to link ? (Ex: backup, ...)\033[0m"
-
-	mapfile -t apps < <(ls "$workspace/apps")
-
-	if [ "${#apps[@]}" != "0" ]
-	then
-		for i in "${!apps[@]}"
-		do
-			echo "	- ${apps[$i]}"
-		done
-	fi
-
-	read -rp "> " app
+	echo -e " \033[1m- Please specify an app id\033[0m"
+	exit 1
 fi
 
-if [ ! -d "$workspace/apps/$app" ]
+if [ ! -d "$workspace/instances/master/apps-extra/$app" ]
 then
 	echo "Cloning $app."
-	git clone "git@github.com:nextcloud/$app.git" "$workspace/apps/$app"
-	git -C "$workspace/apps/$app" fetch --force --tags --prune --prune-tags --recurse-submodules --quiet
+	git clone "git@github.com:nextcloud/$app.git" "$workspace/instances/master/apps-extra/$app"
+	git -C "$workspace/instances/master/apps-extra/$app" fetch --force --tags --prune --prune-tags --recurse-submodules --quiet
 fi
 
 if [ ! -d "$workspace/instances/$instance/apps-extra/$app" ]
 then
-	mainBranch="$(git -C "$workspace/apps/$app" rev-parse --verify --quiet --abbrev-ref origin/HEAD --)"
+	mainBranch="$(git -C "$workspace/instances/master/apps-extra/$app" rev-parse --verify --quiet --abbrev-ref origin/HEAD --)"
 	mainBranch="${mainBranch#origin/}"
 
-	git -C "$workspace/apps/$app" worktree add --quiet --force "$workspace/instances/$instance/apps-extra/$app" "$instance" ||
-	git -C "$workspace/apps/$app" worktree add --quiet --force "$workspace/instances/$instance/apps-extra/$app" "$mainBranch" ||
-	git -C "$workspace/apps/$app" worktree add --quiet --force "$workspace/instances/$instance/apps-extra/$app" "master"
+	git -C "$workspace/instances/master/apps-extra/$app" worktree add --quiet --force "$workspace/instances/$instance/apps-extra/$app" "$instance" ||
+	git -C "$workspace/instances/master/apps-extra/$app" worktree add --quiet --force "$workspace/instances/$instance/apps-extra/$app" "$mainBranch" ||
+	git -C "$workspace/instances/master/apps-extra/$app" worktree add --quiet --force "$workspace/instances/$instance/apps-extra/$app" "master"
 fi
 
 git -C "$workspace/instances/$instance/apps-extra/$app" fetch --force --tags --prune --prune-tags --recurse-submodules --quiet || echo "Failed to fetch $app"
