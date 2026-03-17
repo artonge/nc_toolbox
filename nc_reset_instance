@@ -655,12 +655,12 @@ echo -e " \033[1m- Recreating ${database:-mysql} database.\033[0m"
 	then
 		start_service mariadb
 		dbPort=3306
-		mysql <<-EOSQL
+		mariadb <<-EOSQL
 			DROP DATABASE IF EXISTS $instanceID;
 			CREATE DATABASE $instanceID;
 
 			CREATE USER IF NOT EXISTS nextcloud IDENTIFIED BY 'password';
-			GRANT ALL PRIVILEGES ON $instanceID.* TO nextcloud identified by 'password';
+			GRANT ALL PRIVILEGES ON $instanceID.* TO nextcloud;
 		EOSQL
 	elif [ "${database:-mysql}" == "pgsql" ]
 	then
