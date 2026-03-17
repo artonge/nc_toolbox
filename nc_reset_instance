@@ -11,7 +11,7 @@ function start_service {
 	fi
 }
 
-for service in php-fpm blackfire-agent nginx redis
+for service in php-fpm blackfire-agent nginx valkey
 do
 	start_service "$service"
 done
