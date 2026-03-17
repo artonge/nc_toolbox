@@ -14,8 +14,20 @@ fi
 
 echo "Switching from $current_version to $target_version"
 
-# https://computingforgeeks.com/how-to-install-php-on-fedora/
-# sudo dnf module -y --quiet remove "php:remi-$current_version"
-sudo dnf module -y --quiet reset "php:remi-$current_version"
-sudo dnf module -y --quiet install "php:remi-$target_version"
+# https://rpms.remirepo.net/wizard/
+sudo dnf module -y --quiet reset php
+sudo dnf module -y --quiet enable "php:remi-$target_version"
+sudo dnf install -y --quiet php
+
+
+if [[ "$(printf '%s\n' "$target_version" "$current_version" | sort -V | head -n1)" == "$current_version" && "$target_version" != "$current_version" ]]; then
+	# sudo dnf update -y --quiet
+	# Switch back to the above if the bellow does not work
+	sudo dnf update -y --quiet php-common
+elif [[ "$target_version" == "$current_version" ]]; then
+	echo "Target version is the same as current version."
+else
+	sudo dnf downgrade -y --quiet php-common
+fi
+
 sudo dnf reinstall -y --quiet blackfire-php
