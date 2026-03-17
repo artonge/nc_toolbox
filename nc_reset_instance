@@ -733,7 +733,7 @@ echo -e " \033[1m- Recreating ${database:-mysql} database.\033[0m"
 				-extfile "$certPath/server_cert.conf" \
 				-extensions x509_ext
 
-			cp "$livePath/chain.pem" "$certPath/CAs"
+			sudo cp "$livePath/chain.pem" "$certPath/CAs"
 		fi
 
 		if ! grep "minio.test" /etc/hosts 1> /dev/null
