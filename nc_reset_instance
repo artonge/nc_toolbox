@@ -874,7 +874,7 @@ echo -e " \033[1m- Calling installation command.\033[0m"
 			occ --quiet ldap:set-config s01 ldapUserFilterObjectclass "inetOrgPerson" &
 			occ --quiet ldap:set-config s01 ldapUserFilter "(|(objectclass=inetOrgPerson))" &
 			occ --quiet ldap:set-config s01 ldapUserDisplayName "displayName" &
-			occ --quiet ldap:set-config s01 ldapExpertUsernameAttr "sn" &
+			occ --quiet ldap:set-config s01 ldapExpertUsernameAttr "uid" &
 			occ --quiet ldap:set-config s01 ldapLoginFilter "(&(|(objectclass=inetOrgPerson))(|(sn=%uid)(mail=%uid)))" &
 			occ --quiet ldap:set-config s01 ldapConfigurationActive 1 &
 			occ --quiet ldap:set-config s01 ldapLoginFilterMode 1 &
