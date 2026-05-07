@@ -634,6 +634,9 @@ echo -e " \033[1m- Setting up apps.\033[0m"
 		setup_app "apps-extra" "$app" "git@github.com:nextcloud/$app.git"
 	done
 
+	echo "Disabling firstrunwizard as this is a pain."
+	occ app:disable firstrunwizard
+
 	wait
 }
 
